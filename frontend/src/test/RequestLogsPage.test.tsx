@@ -133,13 +133,19 @@ describe('RequestLogsPage', () => {
 
   it('shows the error panel with retry when the first load fails, then recovers (K-55 step 1)', async () => {
     const user = userEvent.setup();
-    let call = 0;
+    let requestLogCalls = 0;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
-        urls.push(String(input));
-        call++;
-        if (call === 1) {
+        const url = String(input);
+        urls.push(url);
+        // The SavedViewsMenu list call rides along on mount — always healthy here;
+        // the error scenario targets the request-logs query itself.
+        if (url.startsWith('/api/v1/saved-views')) {
+          return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        requestLogCalls++;
+        if (requestLogCalls === 1) {
           return new Response(JSON.stringify({ error: 'Internal Server Error' }), { status: 500 });
         }
         return new Response(JSON.stringify(REQUEST_LOGS_PAYLOAD), { status: 200, headers: { 'Content-Type': 'application/json' } });

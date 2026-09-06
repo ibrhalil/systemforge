@@ -20,7 +20,7 @@ import {
   saveTablePreferences,
   type TableViewMode,
 } from '../../lib/tablePreferences';
-import type { FilterCriteria, SortState } from '../../types';
+import type { FilterCriteria, SavedViewPrefs, SortState } from '../../types';
 import { useVirtualList } from '../../lib/useVirtualList';
 import { Badge } from './Badge';
 import { Button } from './Button';
@@ -133,6 +133,12 @@ interface DataTableProps<T> {
   /** Error-state icon (defaults to LuTriangleAlert). */
   errorIcon?: IconType;
   /**
+   * External prefs snapshot (saved view, K-56 F3): applied whenever `nonce`
+   * changes. Ephemeral by design — not written to localStorage; the user's own
+   * stored preferences remain the reload baseline.
+   */
+  appliedPrefs?: { nonce: number; prefs: SavedViewPrefs } | null;
+  /**
    * Virtualization (K-56 F2, table mode only): tbody renders a fixed-row-height
    * window inside the table's own vertical scroll container. Assumes single-line
    * uniform rows; card/list modes ignore this.
@@ -188,6 +194,7 @@ export function DataTable<T>({
   virtualized = false,
   rowHeight,
   scrollHeight,
+  appliedPrefs,
 }: DataTableProps<T>) {
   const { t } = useT();
 
@@ -209,6 +216,16 @@ export function DataTable<T>({
   const activeViewMode =
     controlledViewMode ??
     (viewModes && !viewModes.includes(internalViewMode) ? viewModes[0] ?? 'table' : internalViewMode);
+
+  // Saved-view prefs application (K-56 F3): re-applied on every nonce change; the
+  // effectiveHiddenColumns memo still enforces hideable:false + one-visible rules.
+  const appliedPrefsNonce = useRef(-1);
+  useEffect(() => {
+    if (!appliedPrefs || appliedPrefs.nonce === appliedPrefsNonce.current) return;
+    appliedPrefsNonce.current = appliedPrefs.nonce;
+    setHiddenColumns(appliedPrefs.prefs.hiddenColumns ?? []);
+    setDensity(appliedPrefs.prefs.density ?? 'normal');
+  }, [appliedPrefs]);
 
 
   const effectiveHiddenColumns = useMemo(() => {

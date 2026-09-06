@@ -17,6 +17,7 @@ import { notify } from '../../lib/notify';
 import { saveBlob } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useListPageState } from '../../lib/useListPageState';
+import type { SavedViewPrefs } from '../../types';
 
 /**
  * Read-only admin view over {@code t_request_logs} (K-19 layer 3 + K-27).
@@ -32,6 +33,9 @@ export function RequestLogsPage() {
   } = useListPageState({ defaultSort: { field: 'createdDate', direction: 'desc' }, storageKey: 'request-logs', syncUrl: true });
   const { data, isLoading, isFetching, error, refetch } = useRequestLogs(listParams);
   const [detail, setDetail] = useState<RequestLog | null>(null);
+  // Saved-view prefs channel (K-56 F3): applying a view pushes its column prefs
+  // into the table; the nonce makes re-applying the same view work too.
+  const [appliedPrefs, setAppliedPrefs] = useState<{ nonce: number; prefs: SavedViewPrefs } | null>(null);
 
   // Aligned with the backend's searchable registrations (RequestLogQueryService.REQUEST_LOG_FIELDS).
   const requestSearchFields = [
@@ -176,9 +180,15 @@ export function RequestLogsPage() {
         onRefresh={() => refetch()}
         filters={filters}
         onFiltersChange={setFilters}
+        appliedPrefs={appliedPrefs}
         toolbar={
           <>
-            <SavedViewsMenu storageKey="request-logs" state={currentQuery} onApply={applySearchQuery} />
+            <SavedViewsMenu
+              storageKey="request-logs"
+              state={currentQuery}
+              onApply={applySearchQuery}
+              onApplyPrefs={(prefs) => setAppliedPrefs({ nonce: Date.now(), prefs })}
+            />
             <SearchInput
               value={search}
               onChange={setSearch}

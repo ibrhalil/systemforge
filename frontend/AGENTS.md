@@ -98,7 +98,9 @@ components/              # cross-feature/shared components
                             #   right-aligned, visible only while an interval is active)),
                             #   Drawer (K-55 F3 right slide-over dialog — row-detail surface; focus contract shared
                             #   with Modal via lib/useDialogPanel), CopyableValue (mono + one-click copy),
-                            #   JsonBlock (pretty JSON), SavedViewsMenu (K-55 F7 named views, localStorage v1),
+                            #   JsonBlock (pretty JSON), SavedViewsMenu (K-56 F3 named views, DB-backed v2 — saves
+                            #   the query snapshot + column prefs block, applies both, silently migrates v1
+                            #   localStorage rows; hidden without iam:saved-view:read),
                             #   EmptyState, Field, Modal, RowMenu (row/page-head overflow menu —
                             #   callers filter items by permission; empty items = no trigger),
                             #   SelectInput, TextArea, Spinner (single animate-spin source),
@@ -110,7 +112,9 @@ components/              # cross-feature/shared components
     users/                 #   Users/UserDetail/Profile pages + 5 modal components (assign
                            #   modals fetch the user detail themselves — list rows are the
                            #   flat user-directory projection: counts, no role/group arrays)
-    roles/  groups/  permissions/
+     roles/  groups/  permissions/
+     saved-views/           # per-user DB-backed list views (K-56 F3): api/hooks/types — the
+                            # backend surface behind SavedViewsMenu (['saved-views', storageKey] keys)
     projects/              #   Typed project containers (K-45): ProjectsPage (create modal's type
                            #   options derive from the ACTIVE-module catalog — useProjectTypes), the
                            #   three-way ProjectDetailPage switch (TaskBoard / ProjectNotesPanel /
@@ -145,7 +149,7 @@ lib/                     # api (fetch + 401 refresh + K-55 searchQueryGet/sq wir
                             # useListPageState (list-page scaffold: page/sort(s incl. multi-sort chains ≤5)/search
                             # + debounce + page-reset + syncUrl (flat paging/sort + sq filter blob) + applySearchQuery + currentQuery),
                             # searchQuery (K-55 URL-state codec: filter/search state JSON → base64url `sq` param),
-                            # savedViews (K-55 F7 localStorage named views), useDialogPanel (Modal/Drawer focus trap),
+                            # savedViews (K-56 F3 legacy localStorage v1 rows — the silent DB-migration source only), useDialogPanel (Modal/Drawer focus trap),
                             # useClientPagination, useDebouncedValue
                             # apiClient.ts  — shared `createApiClient` factory (tenant + platform clients)
                             # platformApi.ts  — platform instance (refresh `/api/v1/platform/auth/refresh`, NO X-Tenant-ID)

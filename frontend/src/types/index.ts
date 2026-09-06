@@ -97,11 +97,22 @@ export interface SearchRequestBody {
 }
 
 /**
+ * Column/display preferences carried by saved-view snapshots v2 (K-56 F3) — the
+ * table prefs that exist as features today (hidden columns + density). Saved on
+ * view-save, applied ephemerally on view-apply.
+ */
+export interface SavedViewPrefs {
+  hiddenColumns?: string[];
+  density?: 'compact' | 'normal' | 'relaxed';
+}
+
+/**
  * The FULL view state of a list page (K-55): what a saved view or a shared link
  * captures — paging + sorting (flat URL params) plus the filter blob
- * (`SearchQueryState`, the `sq` param). `v:1` versions the snapshot shape.
+ * (`SearchQueryState`, the `sq` param). `v:1` = query-only snapshot (localStorage
+ * era / shared links); `v:2` adds the optional `prefs` block (K-56).
  */
-export type ListQuerySnapshot = SearchRequestBody & { v: 1 };
+export type ListQuerySnapshot = SearchRequestBody & { v: 1 | 2; prefs?: SavedViewPrefs };
 
 /** GET list params + structured filter clauses — the `searchOrList` entry-point params. */
 export type SearchOrListParams = PageParams & Pick<SearchRequestBody, 'filters'>;

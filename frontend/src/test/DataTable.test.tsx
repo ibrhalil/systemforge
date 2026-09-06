@@ -1267,3 +1267,53 @@ describe('DataTable virtualization (K-56 F2)', () => {
     expect(screen.getAllByText(/Row \d+/).length).toBe(100);
   });
 });
+
+describe('DataTable appliedPrefs (K-56 F3)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useLocaleStore.setState({ locale: 'en' });
+  });
+
+  it('applies a saved-view prefs snapshot on nonce change', async () => {
+    const props = {
+      columns,
+      data: rows,
+      rowKey: (r: Row) => r.id,
+      page: 0,
+      pageSize: 10,
+      totalElements: 2,
+      totalPages: 1,
+      onPageChange: vi.fn(),
+    };
+    const view = render(
+      <DataTable<Row> {...props} appliedPrefs={{ nonce: 1, prefs: { hiddenColumns: ['note'], density: 'compact' } }} />,
+    );
+
+    // hiddenColumns applied — the Note column header is gone.
+    expect(screen.queryByRole('columnheader', { name: /note/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /name/i })).toBeInTheDocument();
+
+    // Re-applying with a new nonce restores it.
+    view.rerender(<DataTable<Row> {...props} appliedPrefs={{ nonce: 2, prefs: {} }} />);
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: /note/i })).toBeInTheDocument());
+  });
+
+  it('clamps a hide-all prefs snapshot to keep one column visible', () => {
+    render(
+      <DataTable<Row>
+        columns={columns}
+        data={rows}
+        rowKey={(r) => r.id}
+        page={0}
+        pageSize={10}
+        totalElements={2}
+        totalPages={1}
+        onPageChange={vi.fn()}
+        appliedPrefs={{ nonce: 1, prefs: { hiddenColumns: ['name', 'note'] } }}
+      />,
+    );
+
+    expect(screen.getAllByRole('columnheader').length).toBe(1);
+    expect(screen.getByRole('columnheader', { name: /note/i })).toBeInTheDocument();
+  });
+});
