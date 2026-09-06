@@ -1,4 +1,5 @@
 import type { CompanyStatus } from '../auth/types';
+import { Link } from 'react-router-dom';
 import type { PlatformCompany } from './types';
 import { usePlatformCompanies } from './hooks';
 import { DataTable, type Column } from '../../components/ui/DataTable';
@@ -46,7 +47,7 @@ export function PlatformCompaniesPage() {
       sortKey: 'name',
       filter: { field: 'name', control: 'text' },
       hideable: false,
-      render: (c) => <span className="font-medium text-main">{c.name}</span>,
+      render: (c) => <Link to={`/platform/companies/${c.id}`} className="font-medium text-main transition-colors hover:text-accent">{c.name}</Link>,
     },
     {
       key: 'subdomain',
@@ -110,12 +111,12 @@ export function PlatformCompaniesPage() {
           />
         }
         actions={(c) => (
-          <a
-            href={`/platform/companies/${c.id}`}
+          <Link
+            to={`/platform/companies/${c.id}`}
             className="text-sm font-medium text-accent transition-colors hover:text-accent-blue"
           >
             {t('common.view')}
-          </a>
+          </Link>
         )}
         actionsHeader={t('common.actions')}
       />

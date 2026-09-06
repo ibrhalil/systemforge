@@ -2,123 +2,53 @@ import { useState } from 'react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
 import { TextField } from '../../../../components/ui/Field';
-import { TextAreaField } from '../../../../components/ui/TextArea';
-import { SelectInput } from '../../../../components/ui/SelectInput';
-import { Toggle } from '../../../../components/ui/Toggle';
-import { CheckboxList, type CheckboxItem } from '../../../../components/ui/CheckboxList';
 import { DemoSection } from '../../components/DemoSection';
-import type { SelectOption } from '../../../../lib/select';
-import { LuPlus, LuCheck } from 'react-icons/lu';
+import { LuKeyRound, LuCheck } from 'react-icons/lu';
 
-const PROJECT_TYPES: SelectOption<string>[] = [
-  { value: 'software', label: 'Software Development (Kanban + Tasks)' },
-  { value: 'custom_apps', label: 'Dynamic Database CustomApp (CustomApp Builder)' },
-  { value: 'knowledge', label: 'Team Documentation & Notes' },
-];
-
-const MODULE_TAGS: CheckboxItem[] = [
-  { id: 'mod_tasks', label: 'Enable Task Sprints', description: 'Interactive Kanban board and deadline tracker' },
-  { id: 'mod_notes', label: 'Enable Markdown Wiki', description: 'Shared team knowledge base and document editor' },
-  { id: 'mod_apps', label: 'Enable Custom Records', description: 'Airtable/Notion-style flexible database tables' },
-];
-
-function LiveFormModal() {
+function LiveQuickActionModal() {
   const [open, setOpen] = useState(false);
-  const [createdProject, setCreatedProject] = useState<{
-    name: string;
-    key: string;
-    type: string;
-    publicAccess: boolean;
-    modules: string[];
-  } | null>(null);
-
-  // Form states
-  const [name, setName] = useState('');
-  const [key, setKey] = useState('');
-  const [type, setType] = useState<SelectOption<string> | null>(PROJECT_TYPES[0]);
-  const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
-  const [selectedModules, setSelectedModules] = useState<string[]>(['mod_tasks', 'mod_notes']);
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Field validation errors
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const validate = () => {
-    const errs: Record<string, string> = {};
-    if (!name.trim()) errs.name = 'Project title is required';
-    if (!key.trim()) errs.key = 'Project key identifier is required';
-    else if (!/^[A-Z0-9_-]{2,10}$/.test(key.trim().toUpperCase())) {
-      errs.key = 'Key must be 2-10 alphanumeric characters (e.g. SF, CORE)';
-    }
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
-
-  const handleNameChange = (val: string) => {
-    setName(val);
-    if (!key || key.length <= 4) {
-      // Auto generate uppercase acronym key
-      const autoKey = val
-        .split(' ')
-        .filter(Boolean)
-        .map((w) => w[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 5);
-      if (autoKey) setKey(autoKey);
-    }
-  };
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = () => {
-    if (!validate()) return;
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    setError(null);
     setLoading(true);
+    // Simulate server mutation
     setTimeout(() => {
       setLoading(false);
-      setCreatedProject({
-        name,
-        key: key.toUpperCase(),
-        type: type?.label || 'Software',
-        publicAccess: isPublic,
-        modules: selectedModules,
-      });
       setOpen(false);
-      // Reset form
-      setName('');
-      setKey('');
-      setDescription('');
-      setErrors({});
-    }, 1000);
+      setPassword('');
+      setDone(true);
+    }, 900);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="primary" onClick={() => setOpen(true)}>
-          <LuPlus className="h-4 w-4" />
-          <span>Create New Project</span>
+        <Button variant="primary" onClick={() => { setDone(false); setOpen(true); }}>
+          <LuKeyRound className="h-4 w-4" />
+          <span>Reset Password</span>
         </Button>
       </div>
 
-      {createdProject && (
-        <div className="rounded-xl border border-accent-green/30 bg-accent-green/5 p-4 space-y-2">
+      {done && (
+        <div className="rounded-lg border border-accent-green/30 bg-accent-green/5 p-4 space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-accent-green">
             <LuCheck className="h-4 w-4" />
-            <span>Project Created Successfully!</span>
-          </div>
-          <div className="text-xs text-main grid grid-cols-2 gap-2 mt-2">
-            <p><span className="text-muted">Name:</span> {createdProject.name} ({createdProject.key})</p>
-            <p><span className="text-muted">Type:</span> {createdProject.type}</p>
-            <p><span className="text-muted">Visibility:</span> {createdProject.publicAccess ? 'Public' : 'Tenant Private'}</p>
-            <p><span className="text-muted">Enabled Modules:</span> {createdProject.modules.length} selected</p>
+            <span>Password reset email dispatched!</span>
           </div>
         </div>
       )}
 
       <Modal
         open={open}
-        size="lg"
-        title="Create Project Container"
+        title="Reset Password"
         onClose={() => setOpen(false)}
         footer={
           <>
@@ -126,137 +56,71 @@ function LiveFormModal() {
               Cancel
             </Button>
             <Button variant="primary" onClick={handleSubmit} loading={loading}>
-              Create Project
+              Send Reset
             </Button>
           </>
         }
       >
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <TextField
-                label="Project Title"
-                placeholder="e.g. Core Banking Platform"
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                error={errors.name}
-                hint="Human-readable project name"
-              />
-            </div>
-            <div>
-              <TextField
-                label="Key (Prefix)"
-                placeholder="CBP"
-                value={key}
-                onChange={(e) => setKey(e.target.value.toUpperCase())}
-                error={errors.key}
-                hint="Used as task prefix (e.g. CBP-12)"
-              />
-            </div>
-          </div>
-
-          <SelectInput
-            label="Project Template / Container Type"
-            options={PROJECT_TYPES}
-            value={type}
-            onChange={(v) => setType(v as SelectOption<string> | null)}
-            hint="Determines default workspace view modes"
+        <div className="space-y-4">
+          <TextField
+            label="New Password"
+            type="password"
+            placeholder="Minimum 8 characters"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={error}
+            hint="A one-time setup link can also be emailed instead."
           />
-
-          <TextAreaField
-            label="Project Description (Optional)"
-            placeholder="High level objectives and scope for this workspace..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-
-          <div className="rounded-xl border border-glass bg-main/[0.02] p-4 space-y-4">
-            <Toggle
-              label="Tenant-Wide Access (All members can view)"
-              checked={isPublic}
-              onChange={setIsPublic}
-            />
-
-            <div className="border-t border-glass pt-3">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-muted mb-2">
-                Active Modules in this Container
-              </span>
-              <CheckboxList
-                items={MODULE_TAGS}
-                selectedIds={selectedModules}
-                onChange={setSelectedModules}
-              />
-            </div>
-          </div>
         </div>
       </Modal>
     </div>
   );
 }
 
-const FORM_MODAL_CODE = `import { Modal } from 'components/ui/Modal';
+const QUICK_ACTION_MODAL_CODE = `import { Modal } from 'components/ui/Modal';
 import { Button } from 'components/ui/Button';
 import { TextField } from 'components/ui/Field';
-import { SelectInput } from 'components/ui/SelectInput';
-import { Toggle } from 'components/ui/Toggle';
 
-export function CreateProjectModal({ open, onClose, onSuccess }: Props) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<SelectOption | null>(null);
-  const [isPublic, setIsPublic] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// Quick helper actions (reset password, assign roles, status change, one-time
+// secret reveal) are the ONLY forms that live in modals. Entity create/edit
+// always navigates to a page (CRUD surface rule).
+export function ResetPasswordModal({ open, userId, onClose }: Props) {
+  const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const reset = useResetPassword(); // mutations.onError -> global toast
 
   const handleSubmit = async () => {
-    if (!name) return setError('Title is required');
-    setLoading(true);
     try {
-      await api.createProject({ name, type: type?.value, isPublic });
-      onSuccess();
+      await reset.mutateAsync({ userId, password });
       onClose();
     } catch (err) {
-      // Global toast catches API errors or extractFieldErrors() maps inline
-    } finally {
-      setLoading(false);
+      setFieldErrors(extractFieldErrors(err)); // inline field errors
     }
   };
 
   return (
     <Modal
       open={open}
-      size="lg"
-      title="Create New Project"
+      title="Reset Password"
       onClose={onClose}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
+          <Button variant="ghost" onClick={onClose} disabled={reset.isPending}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit} loading={loading}>
-            Save Project
+          <Button variant="primary" onClick={handleSubmit} loading={reset.isPending}>
+            Send Reset
           </Button>
         </>
       }
     >
-      <div className="space-y-4">
-        <TextField
-          label="Project Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={error}
-        />
-        <SelectInput
-          label="Container Type"
-          options={typeOptions}
-          value={type}
-          onChange={setType}
-        />
-        <Toggle
-          label="Public Visibility"
-          checked={isPublic}
-          onChange={setIsPublic}
-        />
-      </div>
+      <TextField
+        label="New Password"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        error={fieldErrors.password ?? null}
+      />
     </Modal>
   );
 }`;
@@ -268,19 +132,21 @@ export function FormModalPatternDemo() {
         <div className="inline-flex items-center gap-1.5 rounded-md bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent mb-2">
           Form Pattern
         </div>
-        <h1 className="text-2xl font-bold text-main">Entity Form & Modal Pattern</h1>
+        <h1 className="text-2xl font-bold text-main">Quick Action Modal Pattern</h1>
         <p className="mt-1 text-sm text-muted">
-          Standard creation and update dialog pattern. Integrates validation rules, synchronized input states,
-          SelectInputs, Toggles, and asynchronous submit buttons with loading state.
+          Modals are reserved for single-purpose quick helper actions (reset password, assign roles,
+          status/plan change, one-time secret reveal) and destructive ConfirmDialogs.
+          Entity create/edit NEVER uses a modal — it navigates to a page (see the Entity Detail Page pattern).
+          Keep the form small: one focused action, loading state on the primary button, field errors inline.
         </p>
       </div>
 
       <DemoSection
-        title="Live Interactive Form Dialog"
-        description="Try filling the form, triggering validation errors by clearing inputs, and creating a project container."
-        code={FORM_MODAL_CODE}
+        title="Live Interactive Quick Action"
+        description="Try triggering validation (short password), submitting, and observing the loading state — the modal stays open on error."
+        code={QUICK_ACTION_MODAL_CODE}
       >
-        <LiveFormModal />
+        <LiveQuickActionModal />
       </DemoSection>
     </div>
   );

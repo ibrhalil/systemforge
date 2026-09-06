@@ -1,19 +1,16 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Page } from '../../../../components/Page';
 import { DataTable, type Column } from '../../../../components/ui/DataTable';
 import { SearchInput, type SearchFieldOption } from '../../../../components/ui/SearchInput';
 import { RowMenu } from '../../../../components/ui/RowMenu';
 import { Button } from '../../../../components/ui/Button';
 import { Badge } from '../../../../components/ui/Badge';
-import { Modal } from '../../../../components/ui/Modal';
-import { TextField } from '../../../../components/ui/Field';
-import { SelectInput } from '../../../../components/ui/SelectInput';
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog';
 import { DemoSection } from '../../components/DemoSection';
 import { MOCK_USERS, paginate, sortBy, type MockUser } from '../../mockData';
-import type { SelectOption } from '../../../../lib/select';
 import type { SortState } from '../../../../types';
-import { LuPlus, LuEye, LuPencil, LuTrash2 } from 'react-icons/lu';
+import { LuPlus, LuEye, LuTrash2 } from 'react-icons/lu';
 
 const SEARCH_FIELDS: SearchFieldOption[] = [
   { key: 'email', label: 'Email', searchable: true },
@@ -22,13 +19,12 @@ const SEARCH_FIELDS: SearchFieldOption[] = [
   { key: 'status', label: 'Status', searchable: false },
 ];
 
-const ROLE_OPTIONS: SelectOption<string>[] = [
-  { value: 'admin', label: 'Admin (Full Access)' },
-  { value: 'editor', label: 'Editor (Write & Publish)' },
-  { value: 'viewer', label: 'Viewer (Read Only)' },
-];
+// CRUD surface rule: create/edit navigate to pages; only destructive confirms stay modal.
+// The live demo routes to the real users pages and the demo detail page.
+const DEMO_DETAIL = '/demo/patterns/detail';
 
 function LiveListPage() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<MockUser[]>(MOCK_USERS);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
@@ -36,17 +32,9 @@ function LiveListPage() {
   const [search, setSearch] = useState('');
   const [searchFields, setSearchFields] = useState<string[]>([]);
 
-  // Dialog & Modal states
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editUser, setEditUser] = useState<MockUser | null>(null);
+  // Destructive confirm stays modal (ConfirmDialog)
   const [deleteUser, setDeleteUser] = useState<MockUser | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Form draft state
-  const [formEmail, setFormEmail] = useState('');
-  const [formFirstName, setFormFirstName] = useState('');
-  const [formLastName, setFormLastName] = useState('');
-  const [formRole, setFormRole] = useState<SelectOption<string> | null>(ROLE_OPTIONS[1]);
 
   const toggleSort = (field: string) => {
     setSort((s) => (s.field === field ? { field, direction: s.direction === 'asc' ? 'desc' : 'asc' } : { field, direction: 'asc' }));
@@ -69,34 +57,6 @@ function LiveListPage() {
   const sorted = sortBy(filtered, sort.field as keyof MockUser, sort.direction);
   const result = paginate(sorted, page, pageSize);
 
-  const handleCreate = () => {
-    if (!formEmail) return;
-    const newUser: MockUser = {
-      id: String(Date.now()),
-      email: formEmail,
-      firstName: formFirstName || 'New',
-      lastName: formLastName || 'User',
-      username: formEmail.split('@')[0],
-      role: (formRole?.value as 'admin' | 'editor' | 'viewer') || 'viewer',
-      status: 'active',
-      emailVerified: true,
-      createdAt: new Date().toISOString().split('T')[0],
-      roleCount: 1,
-      groupCount: 0,
-    };
-    setUsers([newUser, ...users]);
-    setCreateModalOpen(false);
-    setFormEmail('');
-    setFormFirstName('');
-    setFormLastName('');
-  };
-
-  const handleSaveEdit = () => {
-    if (!editUser) return;
-    setUsers(users.map((u) => (u.id === editUser.id ? { ...editUser, role: (formRole?.value as 'admin' | 'editor' | 'viewer') || editUser.role } : u)));
-    setEditUser(null);
-  };
-
   const handleDeleteConfirm = () => {
     if (!deleteUser) return;
     setDeleteLoading(true);
@@ -115,7 +75,8 @@ function LiveListPage() {
       hideable: false,
       render: (u) => (
         <div className="flex flex-col">
-          <span className="font-semibold text-main">{u.email}</span>
+          {/* Primary cell links to the detail page (same as UsersPage email cell) */}
+          <Link to={DEMO_DETAIL} className="font-semibold text-main hover:text-accent">{u.email}</Link>
           <span className="text-xs text-muted">{u.firstName} {u.lastName}</span>
         </div>
       ),
@@ -147,13 +108,13 @@ function LiveListPage() {
   ];
 
   return (
-    <div className="rounded-2xl border border-glass bg-bg/50 p-6 shadow-inner">
+    <div className="rounded-lg border border-glass bg-bg/50 p-6 shadow-sm">
       <Page
         breadcrumb={[{ label: 'Directory' }, { label: 'Users' }]}
         title="Users & Members"
         description="Manage tenant members, assign security roles, and view authentication status."
         actions={
-          <Button variant="primary" onClick={() => setCreateModalOpen(true)}>
+          <Button variant="primary" onClick={() => navigate('/users/new')}>
             <LuPlus className="h-4 w-4" />
             <span>Invite User</span>
           </Button>
@@ -188,15 +149,8 @@ function LiveListPage() {
             <RowMenu
               ariaLabel="User actions"
               items={[
-                { label: 'View Details', onClick: () => alert(`Viewing user: ${u.email}`), icon: LuEye },
-                {
-                  label: 'Edit User',
-                  onClick: () => {
-                    setEditUser(u);
-                    setFormRole(ROLE_OPTIONS.find((r) => r.value === u.role) || ROLE_OPTIONS[0]);
-                  },
-                  icon: LuPencil,
-                },
+                // View/edit navigate to the detail page — editing happens in-page there
+                { label: 'View / Edit', onClick: () => navigate(DEMO_DETAIL), icon: LuEye },
                 { label: 'Delete User', onClick: () => setDeleteUser(u), icon: LuTrash2, danger: true },
               ]}
             />
@@ -204,73 +158,7 @@ function LiveListPage() {
         />
       </Page>
 
-      {/* Create Modal */}
-      <Modal
-        open={createModalOpen}
-        title="Invite New User"
-        onClose={() => setCreateModalOpen(false)}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setCreateModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreate}>Send Invitation</Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <TextField
-            label="Email Address"
-            placeholder="colleague@company.internal"
-            value={formEmail}
-            onChange={(e) => setFormEmail(e.target.value)}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <TextField label="First Name" value={formFirstName} onChange={(e) => setFormFirstName(e.target.value)} />
-            <TextField label="Last Name" value={formLastName} onChange={(e) => setFormLastName(e.target.value)} />
-          </div>
-          <SelectInput
-            label="Primary Role"
-            options={ROLE_OPTIONS}
-            value={formRole}
-            onChange={(v) => setFormRole(v as SelectOption<string> | null)}
-          />
-        </div>
-      </Modal>
-
-      {/* Edit Modal */}
-      {editUser && (
-        <Modal
-          open={true}
-          title={`Edit User: ${editUser.email}`}
-          onClose={() => setEditUser(null)}
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setEditUser(null)}>Cancel</Button>
-              <Button variant="primary" onClick={handleSaveEdit}>Save Changes</Button>
-            </>
-          }
-        >
-          <div className="space-y-4">
-            <TextField
-              label="First Name"
-              value={editUser.firstName}
-              onChange={(e) => setEditUser({ ...editUser, firstName: e.target.value })}
-            />
-            <TextField
-              label="Last Name"
-              value={editUser.lastName}
-              onChange={(e) => setEditUser({ ...editUser, lastName: e.target.value })}
-            />
-            <SelectInput
-              label="Security Role"
-              options={ROLE_OPTIONS}
-              value={formRole}
-              onChange={(v) => setFormRole(v as SelectOption<string> | null)}
-            />
-          </div>
-        </Modal>
-      )}
-
-      {/* Delete Confirm */}
+      {/* Delete Confirm — the only modal on a list page (destructive confirmation) */}
       <ConfirmDialog
         open={!!deleteUser}
         title="Delete User Account"
@@ -379,13 +267,14 @@ export function ListPagePatternDemo() {
         <h1 className="text-2xl font-bold text-main">Full List Page Pattern</h1>
         <p className="mt-1 text-sm text-muted">
           The canonical CRUD list pattern used across Users, Roles, Groups, Projects, and Notes.
-          Combines Page header, DataTable, Smart Search, Column Customization, RowMenu actions, Modals, and ConfirmDialog.
+          Combines Page header, DataTable, Smart Search, Column Customization, and RowMenu actions.
+          Create and edit NAVIGATE to the detail page (CRUD surface rule) — the only modal is the destructive ConfirmDialog.
         </p>
       </div>
 
       <DemoSection
         title="Live Interactive List Page"
-        description="Try creating a new user, sorting columns, searching specific fields, editing, and deleting. Full client-side lifecycle simulation."
+        description="Invite User navigates to the real /users/new page; View / Edit opens the demo detail page where editing happens in-page. Try sorting, searching specific fields, and deleting (ConfirmDialog)."
         code={LIST_PAGE_CODE}
       >
         <LiveListPage />

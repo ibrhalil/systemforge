@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LuPencil, LuPlus, LuTrash2 } from 'react-icons/lu';
 import { DataTable, type Column } from '../../../components/ui/DataTable';
 import { RowMenu } from '../../../components/ui/RowMenu';
@@ -21,7 +22,6 @@ import { cellDisplay, cellEditValue, parseCellInput } from '../cellValue';
 import { useValueResolvers } from '../valueLabels';
 import { UserPicker } from '../../../components/pickers/UserPicker';
 import { RelationPicker } from './RelationPicker';
-import { RecordFormModal } from './RecordFormModal';
 
 /** Cell being edited: which record × which property, plus the raw input draft. */
 interface EditState {
@@ -57,6 +57,7 @@ export function RecordTable({
   onRequestEdit?: (record: CustomAppRecord) => void;
 }) {
   const { t } = useT();
+  const navigate = useNavigate();
   const storageKey = `customApp-records-${customApp.id}`;
   const { page, setPage, pageSize, setPageSize, sort, toggleSort, listParams } =
     useListPageState({ defaultSort: { field: 'createdDate', direction: 'desc' }, storageKey });
@@ -71,7 +72,6 @@ export function RecordTable({
   const resolve = useValueResolvers(customApp, override ? override.records : (data?.items ?? []));
 
   const [edit, setEdit] = useState<EditState | null>(null);
-  const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<CustomAppRecord | null>(null);
 
   if (customApp.properties.length === 0) {
@@ -261,15 +261,13 @@ export function RecordTable({
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="m-0 text-sm text-muted">{t('customApps.recordsDesc')}</p>
         {canWrite && (
-          <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/apps/${customApp.id}/records/new`)}>
             <LuPlus aria-hidden className="h-4 w-4" />
             {t('customApps.newRecord')}
           </Button>
         )}
       </div>
       {table}
-
-      {creating && <RecordFormModal customApp={customApp} onClose={() => setCreating(false)} />}
 
       <ConfirmDialog
         open={!!deleting}

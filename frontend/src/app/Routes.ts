@@ -6,6 +6,7 @@ import { PERMISSIONS, type Permission } from '../lib/permissions';
 // the default shape lazy() expects.
 const ProjectsPage = lazy(() => import('../features/projects/ProjectsPage').then((m) => ({ default: m.ProjectsPage })));
 const ProjectDetailPage = lazy(() => import('../features/projects/ProjectDetailPage').then((m) => ({ default: m.ProjectDetailPage })));
+const TaskDetailPage = lazy(() => import('../features/projects/TaskDetailPage').then((m) => ({ default: m.TaskDetailPage })));
 const UsersPage = lazy(() => import('../features/users/UsersPage').then((m) => ({ default: m.UsersPage })));
 const UserDetailPage = lazy(() => import('../features/users/UserDetailPage').then((m) => ({ default: m.UserDetailPage })));
 const RolesPage = lazy(() => import('../features/roles/RolesPage').then((m) => ({ default: m.RolesPage })));
@@ -24,6 +25,7 @@ const UserSessionsPage = lazy(() => import('../features/sessions/UserSessionsPag
 const ModulesPage = lazy(() => import('../features/modules/ModulesPage').then((m) => ({ default: m.ModulesPage })));
 const CustomAppsPage = lazy(() => import('../features/custom-apps/CustomAppsPage').then((m) => ({ default: m.CustomAppsPage })));
 const CustomAppDetailPage = lazy(() => import('../features/custom-apps/CustomAppDetailPage').then((m) => ({ default: m.CustomAppDetailPage })));
+const RecordPage = lazy(() => import('../features/custom-apps/RecordPage').then((m) => ({ default: m.RecordPage })));
 const NotesPage = lazy(() => import('../features/notes/NotesPage').then((m) => ({ default: m.NotesPage })));
 const NoteEditorPage = lazy(() => import('../features/notes/NoteEditorPage').then((m) => ({ default: m.NoteEditorPage })));
 
@@ -42,15 +44,20 @@ export interface AppRoute {
 /** Routes rendered inside the AppShell layout (children of the `/` route). */
 export const SHELL_ROUTES: AppRoute[] = [
   { index: true, Component: ProjectsPage, authority: PERMISSIONS.PROJECT_READ },
+  { path: 'projects/new', Component: ProjectDetailPage, authority: PERMISSIONS.PROJECT_WRITE },
   { path: 'projects/:projectId', Component: ProjectDetailPage, authority: PERMISSIONS.PROJECT_READ },
+  { path: 'projects/:projectId/tasks/:taskId', Component: TaskDetailPage, authority: PERMISSIONS.TASK_READ },
   { path: 'users', Component: UsersPage, authority: PERMISSIONS.USER_READ },
   { path: 'users/new', Component: UserDetailPage, authority: PERMISSIONS.USER_WRITE },
   { path: 'users/:userId', Component: UserDetailPage, authority: PERMISSIONS.USER_READ },
   { path: 'roles', Component: RolesPage, authority: PERMISSIONS.ROLE_READ },
+  { path: 'roles/new', Component: RoleDetailPage, authority: PERMISSIONS.ROLE_WRITE },
   { path: 'roles/:roleId', Component: RoleDetailPage, authority: PERMISSIONS.ROLE_READ },
   { path: 'groups', Component: GroupsPage, authority: PERMISSIONS.GROUP_READ },
+  { path: 'groups/new', Component: GroupDetailPage, authority: PERMISSIONS.GROUP_WRITE },
   { path: 'groups/:groupId', Component: GroupDetailPage, authority: PERMISSIONS.GROUP_READ },
   { path: 'permissions', Component: PermissionsPage, authority: PERMISSIONS.PERMISSION_READ },
+  { path: 'permissions/new', Component: PermissionDetailPage, authority: PERMISSIONS.PERMISSION_WRITE },
   { path: 'permissions/:permissionId', Component: PermissionDetailPage, authority: PERMISSIONS.PERMISSION_READ },
   { path: 'profile', Component: ProfilePage },
   { path: 'audit-logs', Component: AuditLogsPage, authority: PERMISSIONS.AUDIT_READ },
@@ -61,7 +68,10 @@ export const SHELL_ROUTES: AppRoute[] = [
   { path: 'admin/users/:userId/sessions', Component: UserSessionsPage, authority: PERMISSIONS.USER_WRITE },
   { path: 'modules', Component: ModulesPage, authority: PERMISSIONS.MODULE_READ },
   { path: 'custom-apps', Component: CustomAppsPage, authority: PERMISSIONS.CUSTOM_APP_READ },
+  { path: 'apps/new', Component: CustomAppDetailPage, authority: PERMISSIONS.CUSTOM_APP_WRITE },
   { path: 'apps/:customAppId', Component: CustomAppDetailPage, authority: PERMISSIONS.CUSTOM_APP_READ },
+  { path: 'apps/:customAppId/records/new', Component: RecordPage, authority: PERMISSIONS.CUSTOM_APP_RECORD_WRITE },
+  { path: 'apps/:customAppId/records/:recordId', Component: RecordPage, authority: PERMISSIONS.CUSTOM_APP_RECORD_READ },
   { path: 'notes', Component: NotesPage, authority: PERMISSIONS.NOTE_READ },
   { path: 'notes/new', Component: NoteEditorPage, authority: PERMISSIONS.NOTE_WRITE },
   { path: 'notes/:noteId', Component: NoteEditorPage, authority: PERMISSIONS.NOTE_READ },

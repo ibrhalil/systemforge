@@ -14,17 +14,17 @@ test('TASKS project + Kanban task; note in the NOTES module', async ({ page, req
   await loginViaUi(page, tenant)
   await expect(page.getByText('Getting Started')).toBeVisible()
 
-  // --- TASKS module: create a project via the modal
+  // --- TASKS module: create a project on its page (K-58 — create is a page)
   await page.getByRole('button', { name: '+ New Project' }).click()
   await page.getByPlaceholder('e.g. Sprint Board').fill('E2E Board')
   await page.getByRole('combobox').click()
   await page.getByRole('option', { name: 'Tasks — task board' }).click()
-  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 
-  // Create navigates to the project detail (Kanban)
+  // Create lands on the project detail (Kanban)
   await expect(page.getByRole('button', { name: '+ New Task' })).toBeVisible()
 
-  // --- Task appears on the board
+  // --- Task appears on the board (quick-create modal — the kanban exception)
   await page.getByRole('button', { name: '+ New Task' }).click()
   await page.getByPlaceholder('What needs doing?').fill('First E2E task')
   await page.getByRole('button', { name: 'Create', exact: true }).click()

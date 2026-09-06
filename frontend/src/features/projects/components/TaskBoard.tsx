@@ -1,6 +1,7 @@
 import { PERMISSIONS } from '../../../lib/permissions';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   closestCorners,
   DndContext,
@@ -28,7 +29,7 @@ import { TextAreaField } from '../../../components/ui/TextArea';
 import { SelectInput } from '../../../components/ui/SelectInput';
 import { UserPicker } from '../../../components/pickers/UserPicker';
 import { shortenId, formatDate } from '../../../lib/format';
-import { LuEllipsisVertical, LuPencil, LuTrash2 } from 'react-icons/lu';
+import { LuEllipsisVertical, LuEye, LuTrash2 } from 'react-icons/lu';
 import type { SelectOption } from '../../../lib/select';
 import { useT } from '../../../lib/i18n';
 import { cn } from '../../../lib/cn';
@@ -103,7 +104,6 @@ export function TaskBoard({ projectId }: { projectId: string }) {
   const assigneeLabels = useUserLabels((tasks?.items ?? []).map((tk) => tk.assigneeId));
 
   const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const delTask = useDeleteTask();
   const updateTask = useUpdateTask();
@@ -175,7 +175,6 @@ export function TaskBoard({ projectId }: { projectId: string }) {
               canDelete={canDelete}
               movePending={updateTask.isPending}
               onMove={move}
-              onEdit={setEditing}
               onDelete={setDeleting}
             />
           ))}
@@ -186,16 +185,10 @@ export function TaskBoard({ projectId }: { projectId: string }) {
         </DragOverlay>
       </DndContext>
 
+      {/* Kanban quick-create — the documented modal exception (K-58); viewing and
+          editing a task happen on its page (/projects/:id/tasks/:taskId). */}
       {creating && (
-        <TaskModal projectId={projectId} assigneeLabels={assigneeLabels} onClose={() => setCreating(false)} />
-      )}
-      {editing && (
-        <TaskModal
-          projectId={projectId}
-          task={editing}
-          assigneeLabels={assigneeLabels}
-          onClose={() => setEditing(null)}
-        />
+        <QuickCreateTaskModal projectId={projectId} onClose={() => setCreating(false)} />
       )}
 
       <ConfirmDialog
@@ -230,7 +223,6 @@ function TaskColumn({
   canWrite,
   canDelete,
   movePending,
-  onEdit,
   onDelete,
   onMove,
 }: {
@@ -242,7 +234,6 @@ function TaskColumn({
   canWrite: boolean;
   canDelete: boolean;
   movePending: boolean;
-  onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
   onMove: (task: Task, status: TaskStatus) => void;
 }) {
@@ -279,7 +270,6 @@ function TaskColumn({
               canWrite={canWrite}
               canDelete={canDelete}
               movePending={movePending}
-              onEdit={() => onEdit(task)}
               onDelete={() => onDelete(task)}
               onMove={(status) => onMove(task, status)}
             />
@@ -296,7 +286,6 @@ function TaskCard({
   canWrite,
   canDelete,
   movePending,
-  onEdit,
   onDelete,
   onMove,
 }: {
@@ -305,11 +294,11 @@ function TaskCard({
   canWrite: boolean;
   canDelete: boolean;
   movePending: boolean;
-  onEdit: () => void;
   onDelete: () => void;
   onMove: (status: TaskStatus) => void;
 }) {
   const { t } = useT();
+  const navigate = useNavigate();
   const { statusOptions, priorityLabel } = useTaskLabels();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
@@ -328,7 +317,14 @@ function TaskCard({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-medium text-main">{task.title}</span>
+        {/* Card title opens the task page — viewing/editing live there (K-58).
+            PointerSensor distance keeps plain clicks from starting a drag. */}
+        <Link
+          to={`/projects/${task.projectId}/tasks/${task.id}`}
+          className="font-medium text-main transition-colors hover:text-accent"
+        >
+          {task.title}
+        </Link>
         <Badge tone={PRIORITY_TONE[task.priority]}>{priorityLabel[task.priority]}</Badge>
       </div>
       {task.description && <p className="line-clamp-2 text-xs text-muted">{task.description}</p>}
@@ -361,7 +357,7 @@ function TaskCard({
               ariaLabel={t('common.actions')}
               icon={LuEllipsisVertical}
               items={[
-                ...(canWrite ? [{ label: t('common.edit'), onClick: onEdit, icon: LuPencil }] : []),
+                { label: t('common.view'), onClick: () => navigate(`/projects/${task.projectId}/tasks/${task.id}`), icon: LuEye },
                 ...(canDelete ? [{ label: t('common.delete'), onClick: onDelete, icon: LuTrash2, danger: true }] : []),
               ]}
             />
@@ -391,29 +387,25 @@ function TaskDragPreview({ task, assigneeLabels }: { task: Task; assigneeLabels:
   );
 }
 
-function TaskModal({
+/** Kanban quick-create modal — the documented exception to the page-based CRUD
+ *  surface rule (K-58). Editing lives on the task page, never here. */
+function QuickCreateTaskModal({
   projectId,
-  task,
-  assigneeLabels,
   onClose,
 }: {
   projectId: string;
-  task?: Task;
-  assigneeLabels: Map<string, string>;
   onClose: () => void;
 }) {
   const { t } = useT();
   const { statusOptions, priorityOptions } = useTaskLabels();
   const create = useCreateTask();
-  const update = useUpdateTask();
-  const isEdit = !!task;
 
-  const [title, setTitle] = useState(task?.title ?? '');
-  const [description, setDescription] = useState(task?.description ?? '');
-  const [status, setStatus] = useState<TaskStatus>(task?.status ?? 'TODO');
-  const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'MEDIUM');
-  const [assigneeId, setAssigneeId] = useState<string>(task?.assigneeId ?? '');
-  const [dueDate, setDueDate] = useState<string>(task?.dueDate ?? '');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<TaskStatus>('TODO');
+  const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
+  const [assigneeId, setAssigneeId] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const submit = async () => {
@@ -427,13 +419,8 @@ function TaskModal({
       dueDate: dueDate || undefined,
     };
     try {
-      if (isEdit && task) {
-        await update.mutateAsync({ projectId, taskId: task.id, data });
-        notify.success(t('tasks.updated'));
-      } else {
-        await create.mutateAsync({ projectId, data });
-        notify.success(t('tasks.created'));
-      }
+      await create.mutateAsync({ projectId, data });
+      notify.success(t('tasks.created'));
       onClose();
     } catch (e) {
       setFieldErrors(extractFieldErrors(e));
@@ -443,13 +430,13 @@ function TaskModal({
   return (
     <Modal
       open
-      title={isEdit ? t('tasks.editTitle') : t('tasks.newTitle')}
+      title={t('tasks.newTitle')}
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" loading={create.isPending || update.isPending} onClick={submit}>
-            {isEdit ? t('common.save') : t('common.create')}
+          <Button variant="primary" loading={create.isPending} onClick={submit}>
+            {t('common.create')}
           </Button>
         </>
       }
@@ -475,7 +462,6 @@ function TaskModal({
           label={t('tasks.assignee')}
           isClearable
           value={assigneeId || null}
-          valueLabel={assigneeId ? assigneeLabels.get(assigneeId) : undefined}
           onChange={(v) => setAssigneeId(v ?? '')}
           placeholder={t('tasks.unassigned')}
         />

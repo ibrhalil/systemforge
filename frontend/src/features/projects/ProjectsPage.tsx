@@ -1,38 +1,22 @@
 import { PERMISSIONS } from '../../lib/permissions';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { Project, ProjectType } from './types';
-import { useProjects, useProjectTypes, useProjectTypeLabels, useCreateProject, useDeleteProject } from './hooks';
-import { notify, extractFieldErrors } from '../../lib/notify';
+import type { Project } from './types';
+import { useProjects, useTypeOptions, useDeleteProject } from './hooks';
+import { notify } from '../../lib/notify';
 import { LuFolderOpen, LuTrash2 } from 'react-icons/lu';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { PAGE_SIZE_OPTIONS } from '../../lib/pagination';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { RowMenu } from '../../components/ui/RowMenu';
-import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Button } from '../../components/ui/Button';
 import { Page } from '../../components/Page';
 import { Badge } from '../../components/ui/Badge';
-import { TextField } from '../../components/ui/Field';
-import { TextAreaField } from '../../components/ui/TextArea';
-import { SelectInput } from '../../components/ui/SelectInput';
 import { useT } from '../../lib/i18n';
 import { useListPageState } from '../../lib/useListPageState';
 import { useAuthStore } from '../../store/authStore';
 
-/**
- * Type options derive from the ACTIVE-module catalog (GET /projects/types, K-45) —
- * a disabled module's type never shows up as creatable. While the catalog loads the
- * list is empty (create waits for it — the backend enforces the gate regardless).
- */
-function useTypeOptions() {
-  const typeLabels = useProjectTypeLabels();
-  const { data: catalog } = useProjectTypes();
-  return (catalog ?? [])
-    .filter((c) => typeLabels[c.type])
-    .map((c) => ({ value: c.type, label: typeLabels[c.type] }));
-}
 export function ProjectsPage() {
   const { t } = useT();
   const navigate = useNavigate();
@@ -58,7 +42,6 @@ export function ProjectsPage() {
   const canDelete = useAuthStore((s) => s.hasAuthority(PERMISSIONS.PROJECT_DELETE));
   const typeOptions = useTypeOptions();
 
-  const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<Project | null>(null);
 
   // Aligned with the backend's searchable registrations (ProjectService.FILTER_FIELDS).
@@ -107,7 +90,7 @@ export function ProjectsPage() {
       breadcrumb={[{ label: t('nav.projects') }]}
       title={t('projects.title')}
       description={t('projects.desc')}
-      actions={canWrite ? <Button variant="primary" onClick={() => setCreating(true)}>{t('projects.new')}</Button> : undefined}
+      actions={canWrite ? <Button variant="primary" onClick={() => navigate('/projects/new')}>{t('projects.new')}</Button> : undefined}
     >
 
       <DataTable<Project>
@@ -153,8 +136,6 @@ export function ProjectsPage() {
         )}
       />
 
-      {creating && <CreateProjectModal onClose={() => setCreating(false)} />}
-
       <ConfirmDialog
         open={!!deleting}
         title={t('projects.deleteTitle')}
@@ -175,57 +156,5 @@ export function ProjectsPage() {
         onClose={() => setDeleting(null)}
       />
     </Page>
-  );
-}
-
-function CreateProjectModal({ onClose }: { onClose: () => void }) {
-  const { t } = useT();
-  const typeOptions = useTypeOptions();
-  const create = useCreateProject();
-  const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  // No hardcoded default — the first catalog entry wins once the ACTIVE-module
-  // catalog resolves (pm is always active in practice).
-  const [type, setType] = useState<ProjectType | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const submit = async () => {
-    setFieldErrors({});
-    if (!type) return;
-    try {
-      const created = await create.mutateAsync({ name, description: description || undefined, type });
-      notify.success(t('projects.created'));
-      onClose();
-      navigate(`/projects/${created.id}`);
-    } catch (e) {
-      setFieldErrors(extractFieldErrors(e));
-    }
-  };
-
-  return (
-    <Modal
-      open
-      title={t('projects.newTitle')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" loading={create.isPending} disabled={!type} onClick={submit}>{t('common.create')}</Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <TextField label={t('common.name')} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('projects.namePh')} error={fieldErrors.name ?? null} required />
-        <SelectInput
-          label={t('projects.type')}
-          placeholder={t('projects.typePlaceholder')}
-          options={typeOptions}
-          value={typeOptions.find((o) => o.value === type) ?? null}
-          onChange={(next) => setType((next as { value: ProjectType } | null)?.value ?? null)}
-        />
-        <TextAreaField label={t('common.descriptionOptional')} value={description} onChange={(e) => setDescription(e.target.value)} error={fieldErrors.description ?? null} />
-      </div>
-    </Modal>
   );
 }

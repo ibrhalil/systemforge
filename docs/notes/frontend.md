@@ -73,6 +73,27 @@
 - Head pattern (max one visible action + RowMenu overflow) and the save-footer
   placement rule live in frontend/AGENTS.md — no longer duplicated here.
 
+### K-58 CRUD surface rollout (2026-09-06)
+
+- The UserDetailPage mechanics above were promoted to the app-wide pattern
+  (K-58): every entity detail page is ONE component serving `/new` and `/:id`
+  with an in-page edit mode. Roles, groups, permissions, projects, tasks,
+  custom apps, records and platform service accounts were migrated off
+  create/edit modals; the closed exception list lives in frontend/AGENTS.md.
+- Why drafts must be seeded in `startEdit` (not an effect) generalizes beyond
+  users: every save invalidates its collection prefix, so a refetch effect
+  would clobber ANY dirty inline-edit form mid-typing across all these pages.
+- RecordPage has no single-record GET — the record payload comes from the
+  app's bounded records fetch (`useViewRecords`, first 1000) and is picked by
+  id. Views already cap client-side the same way; beyond 1000 records the
+  page shows the not-found fallback (acceptable today, revisit with a
+  `GET /records/{id}` if apps grow).
+- Kanban quick-create stayed a modal deliberately (Jira/Linear convention);
+  the card title/View action navigate to the task page.
+- Demo pattern gallery retargeted: `DetailPagePatternDemo` teaches inline
+  edit, `ListPagePatternDemo` teaches navigation + ConfirmDialog-only,
+  `FormModalPatternDemo` is now the Quick Action Modal pattern.
+
 ### lib/useListPageState.ts (K-39/K-49)
 
 - Contracts: new debounced search term / sort toggle / page-size change /

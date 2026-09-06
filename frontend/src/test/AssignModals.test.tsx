@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AssignRolesModal } from '../features/users/components/AssignRolesModal';
-import { GroupsPage } from '../features/groups/GroupsPage';
+import { GroupDetailPage } from '../features/groups/GroupDetailPage';
 import { useAuthStore } from '../store/authStore';
 import { useLocaleStore } from '../store/localeStore';
 
@@ -64,6 +64,10 @@ function stub(payloads: {
       if (url === '/api/v1/users/u-1') {
         body = payloads.detail ?? USER_DETAIL;
         status = payloads.detailStatus ?? 200;
+      } else if (url === '/api/v1/groups/g-1') {
+        body = GROUP;
+      } else if (url === '/api/v1/groups/g-1/effective-permissions') {
+        body = ['iam:user:read'];
       } else if (url.startsWith('/api/v1/roles')) {
         body = payloads.roles ?? ROLES_PAGE;
       } else if (url.startsWith('/api/v1/groups')) {
@@ -111,7 +115,7 @@ describe('AssignRolesModal (async multi picker)', () => {
   });
 });
 
-describe('AssignGroupRolesModal (via GroupsPage, async multi picker)', () => {
+describe('GroupDetailPage roles AssignSection (async multi picker)', () => {
   beforeEach(() => {
     useLocaleStore.setState({ locale: 'en' });
     useAuthStore.setState({ hasAuthority: () => true });
@@ -122,22 +126,26 @@ describe('AssignGroupRolesModal (via GroupsPage, async multi picker)', () => {
 
   it('assigns roles through the async picker and PUTs the selection', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<GroupsPage />);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/groups/g-1']}>
+          <Routes>
+            <Route path="/groups/:groupId" element={<GroupDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
 
-    expect(await screen.findByText('Developers')).toBeInTheDocument();
+    // Seed chip from the group's current roles (roles section = first combobox).
+    expect(await screen.findAllByRole('combobox')).toHaveLength(2);
 
-    await user.click(screen.getAllByRole('button', { name: 'Actions' })[0]);
-    await user.click(await screen.findByRole('menuitem', { name: 'Roles' }));
-
-    const dialog = await screen.findByRole('dialog');
-    // Seed chip from the group's current roles.
-    expect(await screen.findByText('Developer')).toBeInTheDocument();
-
-    const combobox = dialog.querySelector('input[role="combobox"]')!;
-    await user.click(combobox as HTMLElement);
+    const combobox = screen.getAllByRole('combobox')[0];
+    await user.click(combobox);
     await user.click(await screen.findByRole('option', { name: 'Ops' }));
 
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    // Roles section Save (first of the two section footers).
+    await user.click(screen.getAllByRole('button', { name: 'Save' })[0]);
     await waitFor(() => {
       const put = calls.find((c) => c.method === 'PUT' && c.url === '/api/v1/groups/g-1/roles');
       expect(put?.body).toEqual({ roleIds: ['r-1', 'r-2'] });

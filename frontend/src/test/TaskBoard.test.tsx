@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TaskBoard } from '../features/projects/components/TaskBoard';
 import { useAuthStore } from '../store/authStore';
@@ -10,6 +11,7 @@ const TASKS_PAYLOAD = {
   data: [
     {
       id: 't-1',
+      projectId: 'p-1',
       title: 'Fix login',
       description: null,
       status: 'TODO',
@@ -21,6 +23,7 @@ const TASKS_PAYLOAD = {
     },
     {
       id: 't-2',
+      projectId: 'p-1',
       title: 'Ship release',
       description: null,
       status: 'DONE',
@@ -45,7 +48,9 @@ function renderBoard() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <TaskBoard projectId="p-1" />
+      <MemoryRouter>
+        <TaskBoard projectId="p-1" />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -69,19 +74,25 @@ describe('TaskBoard (card action overflow)', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('keeps edit/delete inside the card overflow menu — no top-level action buttons', async () => {
+  it('keeps view/delete inside the card overflow menu — no top-level action buttons', async () => {
     renderBoard();
 
     expect(await screen.findByText('Fix login')).toBeInTheDocument();
     expect(screen.getByText('Ship release')).toBeInTheDocument();
-    // Destructive/edit actions live only in the RowMenu — no standalone buttons.
+    // Navigation/destructive actions live only in the RowMenu — no standalone buttons.
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getAllByRole('button', { name: 'Actions' })[0]);
-    expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'View' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('card title links to the task detail page', async () => {
+    renderBoard();
+    const title = await screen.findByRole('link', { name: 'Fix login' });
+    expect(title).toHaveAttribute('href', '/projects/p-1/tasks/t-1');
   });
 
   it('deletes through the menu item and its confirm dialog', async () => {

@@ -1,133 +1,19 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LuPlus } from 'react-icons/lu';
 import type { ServiceAccount } from './types';
-import { useCreateServiceAccount, useRevokeServiceAccount, useServiceAccounts } from './hooks';
-import { PLATFORM_PERMISSIONS } from '../../lib/permissions';
+import { useRevokeServiceAccount, useServiceAccounts } from './hooks';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { Page } from '../../components/Page';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { PAGE_SIZE_OPTIONS } from '../../lib/pagination';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { RowMenu, type RowMenuItem } from '../../components/ui/RowMenu';
-import { SelectInput } from '../../components/ui/SelectInput';
-import { TextField } from '../../components/ui/Field';
 import { formatDateTime } from '../../lib/format';
 import { useT } from '../../lib/i18n';
 import { useListPageState } from '../../lib/useListPageState';
-import type { SelectOption } from '../../lib/select';
-
-const SCOPE_OPTIONS: SelectOption<string>[] = Object.values(PLATFORM_PERMISSIONS).map((s) => ({
-  value: s,
-  label: s,
-}));
-
-function RawKeyModal({ rawKey, onClose }: { rawKey: string | null; onClose: () => void }) {
-  const { t } = useT();
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <Modal
-      open={!!rawKey}
-      title={t('platform.svc.rawKeyTitle')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button
-            variant="secondary"
-            onClick={async () => {
-              await navigator.clipboard?.writeText(rawKey ?? '');
-              setCopied(true);
-            }}
-          >
-            {copied ? t('platform.svc.copied') : t('platform.svc.copy')}
-          </Button>
-          <Button variant="primary" onClick={onClose}>
-            {t('common.close')}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <p className="m-0 text-sm text-muted">{t('platform.svc.rawKeyDesc')}</p>
-        <code className="block break-all rounded-lg border border-glass bg-main/5 p-3 font-mono text-sm text-main">
-          {rawKey}
-        </code>
-      </div>
-    </Modal>
-  );
-}
-
-function CreateServiceAccountModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: (rawKey: string) => void;
-}) {
-  const { t } = useT();
-  const create = useCreateServiceAccount();
-  const [name, setName] = useState('');
-  const [scopes, setScopes] = useState<SelectOption<string>[]>([]);
-  const [expiresAt, setExpiresAt] = useState('');
-
-  const submit = async () => {
-    const created = await create.mutateAsync({
-      name: name.trim(),
-      scopes: scopes.map((s) => s.value),
-      expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
-    });
-    onClose();
-    onCreated(created.rawKey);
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={t('platform.svc.createTitle')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button variant="primary" loading={create.isPending} disabled={!name.trim() || scopes.length === 0} onClick={submit}>
-            {t('common.create')}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <TextField
-          id="svc-name"
-          label={t('platform.svc.name')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <SelectInput
-          label={t('platform.svc.scopes')}
-          options={SCOPE_OPTIONS}
-          value={scopes}
-          onChange={(v) => setScopes((v as SelectOption<string>[]) ?? [])}
-          isMulti
-          placeholder={t('common.typeToSearch')}
-        />
-        <TextField
-          id="svc-expires"
-          label={t('platform.svc.expiresAt')}
-          type="date"
-          value={expiresAt}
-          onChange={(e) => setExpiresAt(e.target.value)}
-          hint={t('platform.svc.expiresHint')}
-        />
-      </div>
-    </Modal>
-  );
-}
 
 /**
  * Service accounts (K-50 F5): API-keyed programmatic identities. The raw key is
@@ -135,6 +21,7 @@ function CreateServiceAccountModal({
  */
 export function PlatformServiceAccountsPage() {
   const { t } = useT();
+  const navigate = useNavigate();
   const {
     page, setPage, pageSize, setPageSize, sort, toggleSort,
     search, setSearch, listParams,
@@ -142,8 +29,6 @@ export function PlatformServiceAccountsPage() {
   const { data, isLoading, isFetching, error, refetch } = useServiceAccounts(listParams);
   const revoke = useRevokeServiceAccount();
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [rawKey, setRawKey] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<ServiceAccount | null>(null);
 
   const columns: Column<ServiceAccount>[] = [
@@ -196,7 +81,7 @@ export function PlatformServiceAccountsPage() {
       title={t('platform.nav.serviceAccounts')}
       description={t('platform.svc.desc')}
       actions={
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
+        <Button variant="primary" onClick={() => navigate('/platform/service-accounts/new')}>
           <LuPlus size={16} />
           {t('platform.svc.create')}
         </Button>
@@ -237,14 +122,6 @@ export function PlatformServiceAccountsPage() {
         }}
         actionsHeader={t('common.actions')}
       />
-
-      <CreateServiceAccountModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={setRawKey}
-      />
-
-      <RawKeyModal rawKey={rawKey} onClose={() => setRawKey(null)} />
 
       <ConfirmDialog
         open={!!revokeTarget}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { LuTrash2 } from 'react-icons/lu';
 import { Page } from '../../components/Page';
 import { DataTable, type Column } from '../../components/ui/DataTable';
@@ -16,10 +16,10 @@ import { useAuthStore } from '../../store/authStore';
 import { notify } from '../../lib/notify';
 import type { CustomApp } from './types';
 import { useCustomApps, useDeleteCustomApp, usePlanLimits } from './hooks';
-import { CustomAppFormModal } from './components/CustomAppFormModal';
 
 export function CustomAppsPage() {
   const { t } = useT();
+  const navigate = useNavigate();
   const { page, setPage, pageSize, setPageSize, sort, toggleSort, search, setSearch, searchFields, setSearchFields, filters, setFilters, q, listParams } =
     useListPageState({ defaultSort: { field: 'name', direction: 'asc' }, storageKey: 'customApps', syncUrl: true });
   const { data, isLoading, isFetching, error, refetch } = useCustomApps(listParams);
@@ -30,7 +30,6 @@ export function CustomAppsPage() {
   const canWrite = useAuthStore((s) => s.hasAuthority(PERMISSIONS.CUSTOM_APP_WRITE));
   const canDelete = useAuthStore((s) => s.hasAuthority(PERMISSIONS.CUSTOM_APP_DELETE));
 
-  const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<CustomApp | null>(null);
 
   // Aligned with the backend's searchable registrations (AppBuilderService.FILTER_FIELDS).
@@ -51,7 +50,7 @@ export function CustomAppsPage() {
       filter: { field: 'name', control: 'text' },
       hideable: false,
       render: (a) => (
-        <Link to={`/custom-apps/${a.id}`} className="font-medium text-main transition-colors hover:text-accent">
+        <Link to={`/apps/${a.id}`} className="font-medium text-main transition-colors hover:text-accent">
           {a.icon ? `${a.icon} ${a.name}` : a.name}
         </Link>
       ),
@@ -109,7 +108,7 @@ export function CustomAppsPage() {
               </div>
             )}
             {canWrite && (
-              <Button variant="primary" onClick={() => setCreating(true)}>{t('customApps.new')}</Button>
+              <Button variant="primary" onClick={() => navigate('/apps/new')}>{t('customApps.new')}</Button>
             )}
           </div>
         ) : undefined
@@ -159,7 +158,6 @@ export function CustomAppsPage() {
         )}
       />
 
-      {creating && <CustomAppFormModal onClose={() => setCreating(false)} />}
 
       <ConfirmDialog
         open={!!deleting}
