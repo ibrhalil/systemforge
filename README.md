@@ -227,6 +227,23 @@ npm run build                    # tsc -b && vite build -> dist/
 npm run dev                      # http://localhost:3000 (/api -> :8080 proxy)
 ```
 
+### E2E (Playwright — prod-like jar, K-57)
+
+Kritik kullanıcı yolları (signup→verify→login, session, password reset, modül CRUD) gerçek tek-jar topolojisinde doğrulanır — backend + gömülü frontend `:8080`, mail akışları Mailpit üzerinden.
+
+```bash
+# Önkoşullar (sırayla):
+docker compose up -d db redis mailpit   # altyapı (mail UI: http://localhost:8025)
+./mvnw clean package -DskipTests        # FULL reactor build (jar'a SPA gömülür; -pl backend -am YETMEZ)
+cd frontend
+npx playwright install chromium         # bir kez (tarayıcı indirimi)
+
+npm run e2e          # testleri koşturur; jar yoksa webServer olarak ayağa kaldırır (dev,smtp + APP_BASE_URL)
+npm run e2e:headed   # görsel koşum
+```
+
+Spec başına unique tenant provision edilir (`e2e-*` subdomain) — tekrar koşum çakışmaz, paralel güvenlidir. CI'da `e2e` job'ı required gate'tir (backend VEYA frontend değişince koşar). Rapor: `frontend/playwright-report/`.
+
 ### Yaygın Maven flag'leri
 
 | Flag | Açıklama |

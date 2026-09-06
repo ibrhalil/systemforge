@@ -65,6 +65,10 @@ pnpm-lock.yaml
 # Backend static resources (generated from frontend build, copied by maven-resources-plugin)
 backend/src/main/resources/static/
 
+# Playwright E2E output (K-57)
+frontend/playwright-report/
+frontend/test-results/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -23,6 +23,7 @@ Platform çekirdeği kullanımda: schema-per-tenant multi-tenancy, iki fazlı te
 | **K-48 — user lifecycle + mail** | SMTP kanalı (`MailSender` port + Smtp/Log/InMemory sender'lar, TR/EN şablonlar), `t_auth_tokens` (digest-at-rest + supersede-on-reissue + atomic claim), opsiyonel email doğrulama (verify-email/resend), self-service password reset (forgot/reset, uniform-200 no-enumeration, session kill), `TokenPurgeJob` (ilk `@EnableScheduling`) | K-48 (+RISK-30) |
 | **K-50 — platform süperadmin + servis hesapları** | Global platform kimliği (`public` şeması: `t_platform_users`/`t_platform_api_keys`/`t_platform_audit_logs`), ayrı platform auth yüzeyi (`scope=platform` JWT + `sf_platform_*` cookie'leri), tenant lifecycle + abonelik/modül/rapor endpoint'leri, servis hesapları (`X-API-Key`, scope'lu), tenant'a giriş (switch code → impersonation JWT `act` claim'li, API mirroring yok), RISK-18 kapanışı + K-24 kaldırma, frontend `/platform/*` konsolu + tenant shell impersonation banner | K-50 (+RISK-18) |
 | **K-56 — advanced table features** | Dev-only `QueryInspector` (QueryClient cache event'leri), DataTable sanallaştırma (sıfır-bağımlılık `useVirtualList` + dahili scroll container + sticky header), saved views DB v2 (tenant V6 `t_saved_views`, JSONB snapshot + prefs bloğu, sessiz localStorage migrasyonu, `iam:saved-view:*`; K-55 açık takibi kapandı) | K-56 |
+| **K-57 — E2E Playwright** | Prod-like jar topolojisi (`:8080` gömülü SPA) + SPA fallback/permitAll fix (`SpaFallbackTest`), 4 core spec (signup/session/password-reset/module-crud; Mailpit REST ile mail doğrulama, spec başına tenant provisioning), CI `e2e` required gate (backend‖frontend) | K-57 |
 
 ## Kalan İşler
 
@@ -34,7 +35,6 @@ Platform çekirdeği kullanımda: schema-per-tenant multi-tenancy, iki fazlı te
 - [ ] K-29 notification subsystem (in-app kanalı bağımsız yapılabilir; mail SMTP'ye bağlı)
 - [ ] K-30 activity feed (audit log üstünden türetme + i18n template map)
 - [ ] K-27 artıkları (LOW): approval workflow (`t_pending_actions`), anomaly detection
-- [ ] E2E Playwright — critical path'ler (signup→verify→login, modül CRUD, password reset)
 - [ ] OpenTelemetry tracing (K-33 gateway ile birlikte değerlendirilecek)
 - [ ] Nginx gateway + wildcard TLS (K-33 — proje %90 sonrası; eski Faz 1.5 epikleri bu kapsamda uygulanır)
 - [ ] Pepper rotasyon runbook (docs)

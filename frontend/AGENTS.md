@@ -74,6 +74,12 @@ Interaction ramp (never invent per-component states):
 
 **Inputs/popovers:** `INPUT_BASE`(_SM) recipes; fill `bg-main/5` (toolbar search `bg-surface` = documented exception); error `border-danger/60`. Popovers `border-glass bg-surface shadow-lg shadow-black/10` + z-60 portal in overflow containers. Checkboxes `accent-accent`.
 
+## E2E (K-57)
+
+- `e2e/*.spec.ts` + `e2e/helpers/` (Playwright, `npm run e2e`) run against the prod-like jar (`:8080`, profiles `dev,smtp` + Mailpit) — prereqs in README Build Komutları. `vitest.config.ts` `include` (`src/test/**` only) is a contract: the e2e folder must never leak into Vitest.
+- Spec conventions: every spec provisions its OWN throwaway tenant (`provisionTenantViaApi`, unique `e2e-*` subdomain); negative auth assertions NEVER reuse another spec's tenant (lockout trap: 5 failed logins/15 min); call `useEnglish(page)` before navigation — assertions rely on fixed EN strings.
+- Form `TextField`s often lack for/id association — select by placeholder/role/explicit `#id`, not `getByLabel`.
+
 ## Gotchas
 
 - **z-index scale:** `0` content · `20` sticky · `50` modal · `60` fixed portal menus — nothing in between.

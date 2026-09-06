@@ -61,6 +61,10 @@ public class SecurityConfig {
                         // K-43: dev/test same-port scrape (numerical metrics only). In prod the
                         // management port runs outside this chain, so this matcher is a no-op there.
                         .requestMatchers("/actuator/prometheus").permitAll()
+                        // K-57: embedded SPA — non-API GET (HEAD) requests (index.html,
+                        // hashed assets, client-side routes) are public; API/docs paths
+                        // above stay on their own matchers and anyRequest default.
+                        .requestMatchers(SecurityConfig::isSpaRequest).permitAll()
                         .anyRequest().authenticated())
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.deny())
@@ -144,4 +148,15 @@ public class SecurityConfig {
 
     /** {@link RequestLogFilter} order — inside the security chain (see its registration). */
     private static final int REQUEST_LOG_FILTER_ORDER = -95;
+
+    /** K-57: public GET/HEAD on non-API paths (SPA shell, assets, client routes). */
+    private static boolean isSpaRequest(jakarta.servlet.http.HttpServletRequest request) {
+        String method = request.getMethod();
+        if (!"GET".equals(method) && !"HEAD".equals(method)) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        return !path.startsWith("/api/") && !path.startsWith("/actuator/")
+                && !path.startsWith("/v3/") && !path.startsWith("/swagger");
+    }
 }
