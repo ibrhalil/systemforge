@@ -11,6 +11,7 @@ import { DataTable, type Column } from '../../../components/ui/DataTable';
 import { Badge } from '../../../components/ui/Badge';
 import { RowMenu } from '../../../components/ui/RowMenu';
 import { SearchInput } from '../../../components/ui/SearchInput';
+import { Toggle } from '../../../components/ui/Toggle';
 import { DemoSection } from '../components/DemoSection';
 import {
   MOCK_USERS,
@@ -743,8 +744,70 @@ const TABLE_TOOLS_CODE = `// tableTools renders right of the settings icon (alon
 />`;
 
 /* ─────────────────────────────────────────────────────────────────
-   Assembled page
-───────────────────────────────────────────────────────────────── */
+   12. Virtualized Table (K-56 F2)
+   ───────────────────────────────────────────────────────────────── */
+interface VirtualRow {
+  id: string;
+  label: string;
+  value: number;
+}
+
+// Deterministic 5k rows — enough for the DOM-node difference to be obvious in the inspector.
+const VIRTUAL_ROWS: VirtualRow[] = Array.from({ length: 5000 }, (_, i) => ({
+  id: String(i),
+  label: `Item ${String(i).padStart(4, '0')}`,
+  value: (i * 37) % 1000,
+}));
+
+function VirtualizedExample() {
+  const [virtualized, setVirtualized] = useState(true);
+
+  const columns: Column<VirtualRow>[] = [
+    { key: 'label', header: 'Item', hideable: false },
+    { key: 'value', header: 'Value' },
+    {
+      key: 'parity',
+      header: 'Parity',
+      render: (r) => <Badge tone={r.value % 2 === 0 ? 'green' : 'muted'}>{r.value % 2 === 0 ? 'even' : 'odd'}</Badge>,
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <Toggle checked={virtualized} onChange={setVirtualized} label="Virtualized rendering" />
+      <DataTable<VirtualRow>
+        columns={columns}
+        data={VIRTUAL_ROWS}
+        rowKey={(r) => r.id}
+        page={0}
+        pageSize={VIRTUAL_ROWS.length}
+        totalElements={VIRTUAL_ROWS.length}
+        totalPages={1}
+        onPageChange={() => undefined}
+        virtualized={virtualized}
+        scrollHeight={360}
+      />
+    </div>
+  );
+}
+
+const VIRTUALIZED_CODE = `// 5,000 rows, one page. With virtualized the tbody renders only the viewport
+// window (~20 rows + overscan) inside its own max-height scroll container with a
+// sticky header; without it, all 5,000 <tr> hit the DOM. Toggle the switch and
+// watch the DOM node count / scroll jank.
+
+<DataTable
+  data={rows}                    // 5,000 rows
+  rowKey={(r) => r.id}
+  virtualized                    // table mode only; card/list ignore it
+  scrollHeight={360}             // max height of the internal scroller
+  // rowHeight={49}              // defaults to the density-derived height
+  ...
+/>`;
+
+/* ─────────────────────────────────────────────────────────────────
+    Assembled page
+    ───────────────────────────────────────────────────────────────── */
 export function DataTableDemoPage() {
   return (
     <div className="space-y-10">
@@ -860,6 +923,14 @@ export function DataTableDemoPage() {
         code={VIEW_MODES_CODE}
       >
         <ViewModesExample />
+      </DemoSection>
+
+      <DemoSection
+        title="12. Virtualized Table (5,000 rows)"
+        description="virtualized renders only the viewport window (~20 rows + overscan) inside the table's own max-height scroll container with a sticky header. Toggle it off to feel the 5,000-row DOM. Table view mode only; rowHeight defaults to the density-derived height."
+        code={VIRTUALIZED_CODE}
+      >
+        <VirtualizedExample />
       </DemoSection>
     </div>
   );
