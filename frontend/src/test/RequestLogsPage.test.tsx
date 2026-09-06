@@ -248,4 +248,49 @@ describe('RequestLogsPage', () => {
     expect(screen.getByText('/api/v1/users')).toBeInTheDocument();
     expect(view.container.querySelector('.animate-pulse')).not.toBeNull();
   });
+
+  it('applies a saved view end-to-end: re-query + column prefs (K-56 F3)', async () => {
+    const user = userEvent.setup();
+    const savedView = {
+      id: 'sv-1',
+      storageKey: 'request-logs',
+      name: 'Slow POSTs',
+      state: JSON.stringify({
+        v: 2,
+        q: 'POST',
+        sorts: [{ field: 'path', direction: 'asc' }],
+        prefs: { hiddenColumns: ['userAgent'], density: 'compact' },
+      }),
+      createdDate: '2026-09-06T10:00:00Z',
+      updatedAt: '2026-09-06T10:00:00Z',
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.startsWith('/api/v1/saved-views')) {
+          return new Response(JSON.stringify([savedView]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        urls.push(url);
+        return new Response(JSON.stringify(REQUEST_LOGS_PAYLOAD), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }),
+    );
+
+    renderPage();
+    expect(await screen.findByText('/api/v1/users')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'User Agent' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /views/i }));
+    await user.click(await screen.findByRole('button', { name: 'Slow POSTs' }));
+
+    // Query part: the committed q re-fires the request-logs query (inside the sq blob).
+    await waitFor(() => {
+      expect(urls.some((u) => decodedSq(u)?.q === 'POST')).toBe(true);
+    });
+    // Prefs part: the User Agent column is hidden and the density switched to compact.
+    await waitFor(() => {
+      expect(screen.queryByRole('columnheader', { name: 'User Agent' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('columnheader', { name: /path/i }).className).toContain('py-2');
+  });
 });
