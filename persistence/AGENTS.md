@@ -16,7 +16,7 @@ AuditEntity (@MappedSuperclass — createdDate/updatedDate+by, OffsetDateTime, t
   │    └ BaseEntity (UUID id + equals/hashCode)   <- Company, User, Role, Permission, Group
   │       ├ UserAccount, UserProfile (@MapsId, extends SoftDeleteAuditEntity)
   └ GeneratedIdAuditEntity (UUID id, no soft delete)  <- TenantVerificationToken, UserAuthToken,
-       PlatformUser, PlatformApiKey, PlatformAuditLog (K-50, public schema)
+       PlatformUser, PlatformApiKey, PlatformAuditLog (K-50, public schema), SavedView (K-56)
 ```
 
 (`Plan`/`Subscription`/`TenantModule` are soft-delete `BaseEntity` in the public schema — full tree: ARCHITECTURE.md.)
@@ -79,6 +79,7 @@ Package `com.ibrhalil.forgesys.persistence.repository`. Extends `JpaRepository` 
 - `PlanRepository` (`findByKey`), `SubscriptionRepository` (`findByCompanyId`), `TenantModuleRepository` (`findByCompanyId`, `findByCompanyIdAndModuleKey`) — public şema (K-16)
 - `UserRepository` (`findByEmail`, `findByUsername`, `findGroupMembers`, `findTokenInvalidBefore` [RISK-21 single-col projection], `findUserIdsByRole`/`findUserIdsByGroup`/`findGroupIdsByUserId`/`findUserIdsByGroupIds`/`bulkSetTokenInvalidBefore` [Faz 1 revoke + group-member visibility scope]) — tenant şeması
 - `UserAuthTokenRepository` (`findByTokenHash` — SHA-256 digest lookup, `claimToken` atomic claim, `invalidateOutstanding` supersede-on-reissue, `purgeStale` daily purge) — tenant şeması (user lifecycle, V4)
+- `SavedViewRepository` (`findByUserIdAndStorageKeyOrderByCreatedDateAsc` menu order, `findByIdAndUserId` ownership-scoped lookup — foreign id = not-found, `findByUserIdAndStorageKeyAndNameIgnoreCase` replace-on-save) — K-56, tenant şeması (V6)
 - `RoleRepository` (`findByName`, `existsByIdInAndAllPermissionsTrue`, `findAllByAllPermissionsTrue` [all-permissions flag]) — tenant şeması
 - `PermissionRepository` (`findByName`, `findAllNames` [JPQL name projection], `JpaSpecificationExecutor` — K-37 paged list + `q`) — tenant şeması
 - `GroupRepository` (`findByName`) — tenant şeması
