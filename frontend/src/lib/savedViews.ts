@@ -1,12 +1,10 @@
 import type { ListQuerySnapshot } from '../types';
 
 /**
- * Named list views persisted per table in localStorage (K-55 F7, v1 — browser-local
- * by decision; a DB-backed cross-device version is a later, migration-carrying step).
- * The stored payload is the full list-query snapshot (`ListQuerySnapshot`: paging +
- * sorting + the filter blob), so applying a view is identical to opening a shared
- * link. Legacy snapshots saved by the pre-split shape (paging inside `sq`) degrade
- * gracefully — the codec ignores unknown fields.
+ * Legacy localStorage named views (K-55 F7, v1). Since K-56 F3 the source of truth
+ * is the DB (`features/saved-views` + `t_saved_views`); this module is only the
+ * MIGRATION SOURCE — the SavedViewsMenu silently uploads v1 rows to the DB on
+ * first load and then removes the localStorage key.
  */
 
 export interface SavedView {
@@ -18,7 +16,7 @@ export interface SavedView {
 
 const PREFIX = 'sf_table_views_';
 
-function storageKeyFor(key: string): string {
+export function legacySavedViewsStorageKey(key: string): string {
   return `${PREFIX}${key}`;
 }
 
@@ -30,9 +28,10 @@ function isSavedView(value: unknown): value is SavedView {
     && (v.state as Record<string, unknown>).v === 1;
 }
 
+/** Reads the v1 rows still awaiting DB migration (empty when already migrated). */
 export function listSavedViews(key: string): SavedView[] {
   try {
-    const raw = localStorage.getItem(storageKeyFor(key));
+    const raw = localStorage.getItem(legacySavedViewsStorageKey(key));
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter(isSavedView) : [];
@@ -41,32 +40,11 @@ export function listSavedViews(key: string): SavedView[] {
   }
 }
 
-/** Saves (or replaces, matched case-insensitively by name) the current query state. */
-export function saveSavedView(key: string, name: string, state: ListQuerySnapshot): SavedView | null {
-  const trimmed = name.trim();
-  if (!trimmed) return null;
-  const views = listSavedViews(key);
-  const existing = views.find((v) => v.name.toLowerCase() === trimmed.toLowerCase());
-  const view: SavedView = {
-    id: existing?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
-    name: trimmed,
-    state,
-    createdAt: new Date().toISOString(),
-  };
-  const next = existing ? views.map((v) => (v.id === view.id ? view : v)) : [...views, view];
+/** Called after a successful silent migration — v1 data is now DB-backed. */
+export function clearLegacySavedViews(key: string): void {
   try {
-    localStorage.setItem(storageKeyFor(key), JSON.stringify(next));
+    localStorage.removeItem(legacySavedViewsStorageKey(key));
   } catch {
-    return null; // quota exceeded / private mode — the in-memory list is untouched
-  }
-  return view;
-}
-
-export function deleteSavedView(key: string, id: string): void {
-  const next = listSavedViews(key).filter((v) => v.id !== id);
-  try {
-    localStorage.setItem(storageKeyFor(key), JSON.stringify(next));
-  } catch {
-    // ignore storage failures — deleting is best-effort
+    // ignore storage failures — a leftover key only makes the migration re-check
   }
 }
