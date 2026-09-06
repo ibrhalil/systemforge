@@ -45,6 +45,7 @@ function renderPage() {
       <MemoryRouter initialEntries={[`/custom-apps/${APP_ID}`]}>
         <Routes>
           <Route path="/custom-apps/:customAppId" element={<CustomAppDetailPage />} />
+          <Route path="/apps/:customAppId/records/new" element={<div>RECORD_NEW_PAGE</div>} />
           <Route path="/custom-apps" element={<div>APPS_LIST</div>} />
         </Routes>
       </MemoryRouter>
@@ -94,12 +95,11 @@ describe('CustomAppDetailPage', () => {
     expect(panelList).toHaveClass('flex-wrap');
   });
 
-  it('opens the new record modal from the records panel', async () => {
+  it('navigates to the record create page from the records panel', async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.click(await screen.findByRole('button', { name: /new record/i }));
-    expect(await screen.findByRole('button', { name: 'Create' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/title \*/i)).toBeInTheDocument();
+    expect(await screen.findByText('RECORD_NEW_PAGE')).toBeInTheDocument();
   });
 });

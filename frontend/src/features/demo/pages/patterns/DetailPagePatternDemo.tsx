@@ -6,7 +6,6 @@ import { Badge } from '../../../../components/ui/Badge';
 import { Button } from '../../../../components/ui/Button';
 import { RowMenu } from '../../../../components/ui/RowMenu';
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog';
-import { Modal } from '../../../../components/ui/Modal';
 import { TextField } from '../../../../components/ui/Field';
 import { DemoSection } from '../../components/DemoSection';
 import type { SelectOption } from '../../../../lib/select';
@@ -28,8 +27,10 @@ function LiveDetailPage() {
   const [savingRoles, setSavingRoles] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
-  // Edit Profile Modal
-  const [editModalOpen, setEditModalOpen] = useState(false);
+  // In-page edit mode (users pattern): the draft is seeded ONCE when editing
+  // starts — never from a background refetch effect — so invalidation-driven
+  // refetches cannot clobber the dirty form.
+  const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(userName);
 
   // Delete Confirm
@@ -46,9 +47,14 @@ function LiveDetailPage() {
     setTimeout(() => setSaveSuccessMsg(false), 3000);
   };
 
+  const startEdit = () => {
+    setDraftName(userName);
+    setEditing(true);
+  };
+
   const handleSaveProfile = () => {
     setUserName(draftName);
-    setEditModalOpen(false);
+    setEditing(false);
   };
 
   const handleDelete = () => {
@@ -61,7 +67,7 @@ function LiveDetailPage() {
   };
 
   return (
-    <div className="rounded-2xl border border-glass bg-bg/50 p-6 shadow-inner">
+    <div className="rounded-lg border border-glass bg-bg/50 p-6 shadow-sm">
       <Page
         breadcrumb={[{ label: 'Directory', to: '#' }, { label: 'Users', to: '#' }, { label: userName }]}
         title={
@@ -73,16 +79,9 @@ function LiveDetailPage() {
           </div>
         }
         description={`Account profile and security privileges for ${userEmail}`}
-        actions={
+        actions={!editing ? (
           <>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setDraftName(userName);
-                setEditModalOpen(true);
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={startEdit}>
               <LuPencil className="h-3.5 w-3.5" />
               <span>Edit Profile</span>
             </Button>
@@ -101,26 +100,40 @@ function LiveDetailPage() {
               ]}
             />
           </>
-        }
+        ) : undefined}
       >
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left / Overview Panel */}
           <div className="lg:col-span-1 space-y-6">
             <DetailPanel title="General Information">
-              <dl className="space-y-4">
-                <DetailField label="Display Name">{userName}</DetailField>
-                <DetailField label="Email Address">{userEmail}</DetailField>
-                <DetailField label="User ID">
-                  <span className="font-mono text-xs text-muted">usr_9f8a7b6c5d4e</span>
-                </DetailField>
-                <DetailField label="Tenant Schema">
-                  <span className="font-mono text-xs text-accent">acme_corp_main</span>
-                </DetailField>
-                <DetailField label="Created At">2025-01-10 09:30:15 UTC</DetailField>
-                <DetailField label="Two-Factor Status">
-                  <Badge tone="blue">Enforced</Badge>
-                </DetailField>
-              </dl>
+              {editing ? (
+                <>
+                  <div className="space-y-4">
+                    <TextField label="Display Name" value={draftName} onChange={(e) => setDraftName(e.target.value)} />
+                    {/* Identity-bearing fields are immutable by contract. */}
+                    <TextField label="Email (Read-only)" value={userEmail} disabled />
+                  </div>
+                  <div className="mt-4 flex justify-end gap-3">
+                    <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
+                    <Button variant="primary" onClick={handleSaveProfile}>Save Changes</Button>
+                  </div>
+                </>
+              ) : (
+                <dl className="space-y-4">
+                  <DetailField label="Display Name">{userName}</DetailField>
+                  <DetailField label="Email Address">{userEmail}</DetailField>
+                  <DetailField label="User ID">
+                    <span className="font-mono text-xs text-muted">usr_9f8a7b6c5d4e</span>
+                  </DetailField>
+                  <DetailField label="Tenant Schema">
+                    <span className="font-mono text-xs text-accent">acme_corp_main</span>
+                  </DetailField>
+                  <DetailField label="Created At">2025-01-10 09:30:15 UTC</DetailField>
+                  <DetailField label="Two-Factor Status">
+                    <Badge tone="blue">Enforced</Badge>
+                  </DetailField>
+                </dl>
+              )}
             </DetailPanel>
 
             <DetailPanel title="Effective Direct Permissions">
@@ -177,25 +190,7 @@ function LiveDetailPage() {
         </div>
       </Page>
 
-      {/* Edit Profile Modal */}
-      <Modal
-        open={editModalOpen}
-        title="Edit User Profile"
-        onClose={() => setEditModalOpen(false)}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setEditModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleSaveProfile}>Save Changes</Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <TextField label="Full Name" value={draftName} onChange={(e) => setDraftName(e.target.value)} />
-          <TextField label="Email (Read-only)" value={userEmail} disabled />
-        </div>
-      </Modal>
-
-      {/* Delete Confirm Dialog */}
+      {/* Delete Confirm Dialog — destructive actions stay in ConfirmDialog */}
       <ConfirmDialog
         open={deleteConfirmOpen}
         title="Delete User"
@@ -211,22 +206,34 @@ function LiveDetailPage() {
 }
 
 const DETAIL_PAGE_CODE = `import { Page } from 'components/Page';
-import { DetailPanel, DetailField, PermissionBadges } from 'components/detail/DetailPanel';
+import { DetailPanel, DetailField } from 'components/detail/DetailPanel';
 import { AssignSection } from 'components/detail/AssignSection';
 import { Badge } from 'components/ui/Badge';
 import { Button } from 'components/ui/Button';
 import { RowMenu } from 'components/ui/RowMenu';
 
+// ONE component serves /users/new AND /users/:userId; edit is an in-page mode.
 export function UserDetailPage() {
   const { userId } = useParams();
+  const isCreate = !userId;
   const { data: user } = useUser(userId);
   const { data: allRoles } = useRoles();
   const assignRoles = useAssignRoles();
 
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Partial<User>>({});
+  const formActive = isCreate || editing;
+
+  // Seed the draft ONCE when editing starts — never from a refetch effect, so
+  // invalidation-driven background refetches cannot clobber the dirty form.
+  const startEdit = () => {
+    setDraft({ name: user.name });
+    setEditing(true);
+  };
+
   return (
     <Page
       breadcrumb={[
-        { label: 'Directory', to: '/users' },
         { label: 'Users', to: '/users' },
         { label: user?.email ?? '' },
       ]}
@@ -239,11 +246,12 @@ export function UserDetailPage() {
         </div>
       }
       description={user?.email}
-      actions={
+      actions={!formActive && (
         <>
-          <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-            Edit Profile
+          <Button variant="ghost" size="sm" onClick={startEdit}>
+            Edit
           </Button>
+          {/* Hidden while editing — a dirty form must not trigger parallel mutations. */}
           <RowMenu
             ariaLabel="Options"
             icon={LuEllipsisVertical}
@@ -253,16 +261,29 @@ export function UserDetailPage() {
             ]}
           />
         </>
-      }
+      )}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Definition List Panel */}
         <div className="lg:col-span-1 space-y-6">
           <DetailPanel title="General Information">
-            <dl className="space-y-4">
-              <DetailField label="Email">{user?.email}</DetailField>
-              <DetailField label="Created At">{formatDate(user?.createdAt)}</DetailField>
-            </dl>
+            {formActive ? (
+              <>
+                <div className="space-y-4">
+                  <TextField label="Display Name" value={draft.name ?? ''} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+                  {/* Identity-bearing fields are immutable by contract. */}
+                  <TextField label="Email" value={user?.email ?? ''} disabled />
+                </div>
+                <div className="mt-4 flex justify-end gap-3">
+                  <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
+                  <Button variant="primary" onClick={handleSave}>Save Changes</Button>
+                </div>
+              </>
+            ) : (
+              <dl className="space-y-4">
+                <DetailField label="Email">{user?.email}</DetailField>
+                <DetailField label="Created At">{formatDate(user?.createdAt)}</DetailField>
+              </dl>
+            )}
           </DetailPanel>
         </div>
 
@@ -290,13 +311,15 @@ export function DetailPagePatternDemo() {
         <h1 className="text-2xl font-bold text-main">Entity Detail Page Pattern</h1>
         <p className="mt-1 text-sm text-muted">
           The standard detail view template for viewing and managing single entities (Users, Roles, Groups, Projects).
-          Features definition list cards (`DetailPanel` + `DetailField`), multi-selection assignment sections (`AssignSection`), and head actions.
+          ONE component serves /new and /:id; editing is an in-page mode (draft seeded once, diff save) — never a modal.
+          Features definition list cards (`DetailPanel` + `DetailField`), multi-selection assignment sections (`AssignSection`),
+          and head actions (max two controls; destructive actions only in the overflow).
         </p>
       </div>
 
       <DemoSection
         title="Live Interactive Detail View"
-        description="Try changing assigned roles (dirty-state button triggers save), editing the profile modal, or toggling account lock status."
+        description="Try changing assigned roles (dirty-state button triggers save), switching to in-page edit mode, or toggling account lock status."
         code={DETAIL_PAGE_CODE}
       >
         <LiveDetailPage />

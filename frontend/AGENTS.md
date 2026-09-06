@@ -29,6 +29,11 @@ npm run build     # tsc -b && vite build -> dist/
 - Reference-data selects use the async `components/pickers/*` (debounced `q` typeahead) — never capped one-page list fetches; `CheckboxList` only for small bounded lists.
 - `src/test/` — Vitest suite; mocks via `vi.stubGlobal('fetch')`, `useStore.setState`, `useLocaleStore.setState({locale:'en'})`.
 
+## CRUD surface rule (K-58; users = reference, `demo/patterns/DetailPagePatternDemo`)
+
+- **Entity create/edit/view = PAGE**: list + `/new` + `/:id` all render ONE detail component (`isCreate = !id`); edit is an in-page mode (draft seeded once from data, never from refetch effect; diff/sequential save — see `UserDetailPage`). Reference: `features/users`.
+- **Modal is allowed ONLY for:** destructive confirms (`ConfirmDialog`) · single-purpose quick helpers (AssignRoles/Groups, ResetPassword, company status/plan change, RawKey reveal) · kanban quick task create (card click navigates to the task page) · rare config forms (custom-app property/view) · request-logs Drawer inspector. These are the complete exception list — no new ones without a DECISIONS entry.
+
 ## List-page engine (K-49/K-55)
 
 - Pages get the scaffold from `lib/useListPageState` (`{page, pageSize, sort, search, searchFields, filters, ...}` -> `listParams {page, size, sorts, q, qFields, filters}`) — the ready query argument. Multi-sort chains ≤5.

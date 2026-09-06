@@ -52,7 +52,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Full List Page', to: '/demo/patterns/list', icon: LuLayoutList },
       { label: 'Entity Detail View', to: '/demo/patterns/detail', icon: LuFileText },
-      { label: 'Form & Modal CRUD', to: '/demo/patterns/form', icon: LuSquarePlus },
+      { label: 'Quick Action Modal', to: '/demo/patterns/form', icon: LuSquarePlus },
       { label: 'Dashboard & Metrics', to: '/demo/patterns/dashboard', icon: LuLayoutDashboard },
       { label: 'Master-Detail Split', to: '/demo/patterns/master-detail', icon: LuColumns3 },
     ],

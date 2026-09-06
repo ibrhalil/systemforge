@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RecordBoard } from '../features/custom-apps/components/RecordBoard';
 import { cellDisplay } from '../features/custom-apps/cellValue';
@@ -191,7 +192,9 @@ describe('RecordBoard', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <RecordsPanel customApp={{ ...APP, views: [VIEW] }} />
+        <MemoryRouter>
+          <RecordsPanel customApp={{ ...APP, views: [VIEW] }} />
+        </MemoryRouter>
       </QueryClientProvider>,
     );
 

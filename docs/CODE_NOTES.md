@@ -20,4 +20,4 @@
 | [`notes/backend-security-config.md`](notes/backend-security-config.md) | `backend/security` + `config` | SessionRevocationService, JwtAuthenticationFilter, SecurityConfig, refresh/blacklist stores, LastAdminGuard, PepperingPasswordEncoder, rate limiters, RbacSeeder/runners, PermissionCatalog |
 | [`notes/backend-web.md`](notes/backend-web.md) | `backend/web`, audit, controller, DTO | FilterFieldSet/FilterSpecifications (K-49 engine), SortGuard, ProjectionListQuery, request filters (-102..-94), AuditLogAspect, TenantFilter/TenantContextExecutor, DTO wire contracts |
 | [`notes/persistence.md`](notes/persistence.md) | repository sorguları | UserRepository (yetki çözümleme, oturum iptali, görünürlük kapsamı) |
-| [`notes/frontend.md`](notes/frontend.md) | `frontend/src` | lib/api (refresh-on-401), useListPageState, DataTable/ColumnFilterButton, ReferencePicker, custom-apps types/cellValue, UserDetailPage |
+| [`notes/frontend.md`](notes/frontend.md) | `frontend/src` | lib/api (refresh-on-401), useListPageState, DataTable/ColumnFilterButton, ReferencePicker, custom-apps types/cellValue, UserDetailPage, K-58 CRUD surface rollout |

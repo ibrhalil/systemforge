@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProjectsPage } from '../features/projects/ProjectsPage';
+import { ProjectDetailPage } from '../features/projects/ProjectDetailPage';
 import { useAuthStore } from '../store/authStore';
 import { useLocaleStore } from '../store/localeStore';
 
@@ -12,45 +13,48 @@ const EMPTY_PAGE = {
   meta: { page: 0, pageSize: 10, totalElements: 0, totalPages: 0, hasNext: false, hasPrevious: false },
 };
 
-/** ACTIVE-module catalog (GET /projects/types) — the create modal derives from it (K-45). */
+/** ACTIVE-module catalog (GET /projects/types) — the create page derives from it (K-45). */
 let typesPayload: { type: string; moduleKey: string; defaultProjectId: string | null }[];
 
-function renderPage() {
+function stubTypes() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const payload = url === '/api/v1/projects/types'
+        ? typesPayload
+        : EMPTY_PAGE;
+      return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }),
+  );
+}
+
+function renderCreatePage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <ProjectsPage />
+      <MemoryRouter initialEntries={['/projects/new']}>
+        <Routes>
+          <Route path="/projects/new" element={<ProjectDetailPage />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe('ProjectsPage (typed container catalog)', () => {
+describe('Project create page (typed container catalog)', () => {
   beforeEach(() => {
     useLocaleStore.setState({ locale: 'en' });
     useAuthStore.setState({ hasAuthority: () => true });
     typesPayload = [{ type: 'TASKS', moduleKey: 'pm', defaultProjectId: null }];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        const payload = url.startsWith('/api/v1/projects/types')
-          ? typesPayload
-          : url.startsWith('/api/v1/projects?')
-            ? EMPTY_PAGE
-            : EMPTY_PAGE;
-        return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
-      }),
-    );
+    stubTypes();
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("create modal offers only the ACTIVE modules' types", async () => {
+  it("offers only the ACTIVE modules' types", async () => {
     const user = userEvent.setup();
-    renderPage();
+    renderCreatePage();
 
-    await user.click(screen.getByRole('button', { name: /New Project/ }));
     // Open the type select — only the TASKS entry (notes/apps not activated).
     await user.click(await screen.findByText('Pick a type…'));
     expect(await screen.findByRole('option', { name: /Tasks — task board/ })).toBeInTheDocument();
@@ -65,9 +69,8 @@ describe('ProjectsPage (typed container catalog)', () => {
       { type: 'APPS', moduleKey: 'apps', defaultProjectId: 'p-apps' },
     ];
     const user = userEvent.setup();
-    renderPage();
+    renderCreatePage();
 
-    await user.click(screen.getByRole('button', { name: /New Project/ }));
     await user.click(await screen.findByText('Pick a type…'));
     await waitFor(() => {
       expect(screen.getByRole('option', { name: /Tasks — task board/ })).toBeInTheDocument();
@@ -78,7 +81,14 @@ describe('ProjectsPage (typed container catalog)', () => {
 
   it('hides the create action without pm:project:write', () => {
     useAuthStore.setState({ hasAuthority: (a: string) => a !== 'pm:project:write' });
-    renderPage();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <ProjectsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
 
     expect(screen.queryByRole('button', { name: /New Project/ })).not.toBeInTheDocument();
   });

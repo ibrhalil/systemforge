@@ -1,21 +1,18 @@
 import { PERMISSIONS } from '../../lib/permissions';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LuEye, LuPencil, LuTrash2 } from 'react-icons/lu';
+import { LuEye, LuTrash2 } from 'react-icons/lu';
 import type { Permission } from './types';
 import {
-  usePermissionSearch, useCreatePermission, useUpdatePermission, useDeletePermission,
+  usePermissionSearch, useDeletePermission,
 } from './hooks';
-import { notify, extractFieldErrors } from '../../lib/notify';
+import { notify } from '../../lib/notify';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { RowMenu } from '../../components/ui/RowMenu';
 import { SearchInput } from '../../components/ui/SearchInput';
-import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Button } from '../../components/ui/Button';
 import { Page } from '../../components/Page';
-import { TextField } from '../../components/ui/Field';
-import { TextAreaField } from '../../components/ui/TextArea';
 import { useT } from '../../lib/i18n';
 import { PAGE_SIZE_OPTIONS } from '../../lib/pagination';
 import { useListPageState } from '../../lib/useListPageState';
@@ -50,8 +47,6 @@ export function PermissionsPage() {
   const { data, isLoading, isFetching, error, refetch } = usePermissionSearch(listParams);
   const hasFilterInput = q.length > 0 || filters.length > 0 || searchFields.length > 0;
 
-  const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<Permission | null>(null);
   const [deleting, setDeleting] = useState<Permission | null>(null);
 
   // Aligned with the backend's searchable registrations (PermissionService.FILTER_FIELDS).
@@ -83,7 +78,7 @@ export function PermissionsPage() {
       breadcrumb={[{ label: t('nav.identity') }, { label: t('nav.permissions') }]}
       title={t('common.permissions')}
       description={<>{t('permissions.desc')} <code className="font-mono text-accent">module:resource:action</code>.</>}
-      actions={canWrite ? <Button variant="primary" onClick={() => setCreating(true)}>{t('permissions.new')}</Button> : undefined}
+      actions={canWrite ? <Button variant="primary" onClick={() => navigate('/permissions/new')}>{t('permissions.new')}</Button> : undefined}
     >
 
       <DataTable<Permission>
@@ -122,16 +117,13 @@ export function PermissionsPage() {
           <RowMenu
             ariaLabel={t('common.actions')}
             items={[
+              // Create/edit live on the detail page (CRUD surface rule).
               { label: t('common.view'), onClick: () => navigate(`/permissions/${p.id}`), icon: LuEye },
-              ...(canWrite ? [{ label: t('common.edit'), onClick: () => setEditing(p), icon: LuPencil }] : []),
               ...(canDelete ? [{ label: t('common.delete'), onClick: () => setDeleting(p), icon: LuTrash2, danger: true }] : []),
             ]}
           />
         )}
       />
-
-      {creating && <PermissionFormModal onClose={() => setCreating(false)} />}
-      {editing && <PermissionFormModal permission={editing} onClose={() => setEditing(null)} />}
 
       <ConfirmDialog
         open={!!deleting}
@@ -151,61 +143,5 @@ export function PermissionsPage() {
         onClose={() => setDeleting(null)}
       />
     </Page>
-  );
-}
-
-function PermissionFormModal({ permission, onClose }: { permission?: Permission; onClose: () => void }) {
-  const { t } = useT();
-  const create = useCreatePermission();
-  const update = useUpdatePermission();
-  const [name, setName] = useState(permission?.name ?? '');
-  const [description, setDescription] = useState(permission?.description ?? '');
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const isEdit = !!permission;
-
-  const submit = async () => {
-    setFieldErrors({});
-    try {
-      if (isEdit && permission) {
-        await update.mutateAsync({ id: permission.id, data: { name, description: description || undefined } });
-        notify.success(t('permissions.updated'));
-      } else {
-        await create.mutateAsync({ name, description: description || undefined });
-        notify.success(t('permissions.created'));
-      }
-      onClose();
-    } catch (e) {
-      setFieldErrors(extractFieldErrors(e));
-    }
-  };
-
-  return (
-    <Modal
-      open
-      title={isEdit ? t('permissions.editing', { name: permission!.name }) : t('permissions.newTitle')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" loading={create.isPending || update.isPending} onClick={submit}>
-            {isEdit ? t('common.save') : t('common.create')}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <TextField
-          label={t('common.name')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t('permissions.namePh')}
-          required
-          hint={t('permissions.nameHint')}
-          error={fieldErrors.name ?? null}
-        />
-        <TextAreaField label={t('common.descriptionOptional')} value={description} onChange={(e) => setDescription(e.target.value)} error={fieldErrors.description ?? null} />
-      </div>
-    </Modal>
   );
 }

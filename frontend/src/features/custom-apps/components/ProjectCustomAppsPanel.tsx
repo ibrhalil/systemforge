@@ -1,10 +1,9 @@
 import { PERMISSIONS } from '../../../lib/permissions';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { LuEllipsisVertical, LuPlus, LuTrash2 } from 'react-icons/lu';
 import { useCustomApps, useDeleteCustomApp } from '../hooks';
 import type { CustomApp } from '../types';
-import { CustomAppFormModal } from './CustomAppFormModal';
 import { Button } from '../../../components/ui/Button';
 import { RowMenu } from '../../../components/ui/RowMenu';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
@@ -20,6 +19,7 @@ import { formatDateTime } from '../../../lib/format';
  */
 export function ProjectCustomAppsPanel({ projectId }: { projectId: string }) {
   const { t } = useT();
+  const navigate = useNavigate();
   const { data, isLoading } = useCustomApps({
     projectId,
     page: 0,
@@ -29,7 +29,6 @@ export function ProjectCustomAppsPanel({ projectId }: { projectId: string }) {
   const delApp = useDeleteCustomApp();
   const canWrite = useAuthStore((s) => s.hasAuthority(PERMISSIONS.CUSTOM_APP_WRITE));
   const canDelete = useAuthStore((s) => s.hasAuthority(PERMISSIONS.CUSTOM_APP_DELETE));
-  const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<CustomApp | null>(null);
   const customApps = data?.items ?? [];
 
@@ -38,7 +37,7 @@ export function ProjectCustomAppsPanel({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between gap-3 border-b border-glass px-5 py-3">
         <span className="text-sm font-medium text-main">{t('customApps.inProject')}</span>
         {canWrite && (
-          <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+          <Button variant="primary" size="sm" onClick={() => navigate(`/apps/new?projectId=${projectId}`)}>
             <LuPlus size={14} />
             {t('customApps.new')}
           </Button>
@@ -54,7 +53,7 @@ export function ProjectCustomAppsPanel({ projectId }: { projectId: string }) {
           {customApps.map((a) => (
             <li key={a.id} className="flex items-center gap-3 px-5 py-3">
               <Link
-                to={`/custom-apps/${a.id}`}
+                to={`/apps/${a.id}`}
                 className="min-w-0 flex-1 truncate font-medium text-main transition-colors hover:text-accent"
               >
                 {a.icon ? `${a.icon} ${a.name}` : a.name}
@@ -76,7 +75,6 @@ export function ProjectCustomAppsPanel({ projectId }: { projectId: string }) {
         </ul>
       )}
 
-      {creating && <CustomAppFormModal projectId={projectId} onClose={() => setCreating(false)} />}
 
       <ConfirmDialog
         open={!!deleting}

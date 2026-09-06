@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RecordTable } from '../features/custom-apps/components/RecordTable';
 import type { CustomAppDetail } from '../features/custom-apps/types';
@@ -73,7 +74,9 @@ function renderTable() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <RecordTable customApp={APP} />
+      <MemoryRouter>
+        <RecordTable customApp={APP} />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -157,13 +160,15 @@ describe('RecordTable inline edit', () => {
     expect(screen.queryByRole('button', { name: 'Old title' })).not.toBeInTheDocument();
   });
 
-  it('offers the record form through the row actions menu', async () => {
+  it('requests the record page through the row actions menu (onRequestEdit contract)', async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <RecordTable customApp={APP} onRequestEdit={onEdit} />
+        <MemoryRouter>
+          <RecordTable customApp={APP} onRequestEdit={onEdit} />
+        </MemoryRouter>
       </QueryClientProvider>,
     );
 

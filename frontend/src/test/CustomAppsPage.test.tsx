@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CustomAppsPage } from '../features/custom-apps/CustomAppsPage';
 import { useAuthStore } from '../store/authStore';
@@ -30,7 +30,10 @@ function renderPage() {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <CustomAppsPage />
+        <Routes>
+          <Route path="/" element={<CustomAppsPage />} />
+          <Route path="/apps/new" element={<div>APPS_NEW_PAGE</div>} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -63,15 +66,12 @@ describe('CustomAppsPage', () => {
     expect(screen.getByText('Inventory')).toBeInTheDocument();
   });
 
-  it('opens the create modal with the name field', async () => {
+  it("navigates to the app create page (K-58 — entity create is a page, not a modal)", async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.click(await screen.findByRole('button', { name: '+ New Custom App' }));
-    // Role+name query — the table header also carries a "Filter Name" trigger now (K-49),
-    // so a bare /name/i text match is ambiguous.
-    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
+    expect(await screen.findByText('APPS_NEW_PAGE')).toBeInTheDocument();
   });
 
   it('shows the plan usage indicator from the plan-limits endpoint', async () => {

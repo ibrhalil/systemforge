@@ -1,31 +1,27 @@
 import { PERMISSIONS } from '../../lib/permissions';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { Group } from './types';
-import { useGroups, useCreateGroup, useDeleteGroup, useSetGroupRoles } from './hooks';
+import { useGroups, useDeleteGroup } from './hooks';
 import { rolesApi } from '../roles/api';
 import { usersApi } from '../users/api';
-import { notify, extractFieldErrors } from '../../lib/notify';
-import { LuShield, LuTrash2, LuUsersRound } from 'react-icons/lu';
+import { notify } from '../../lib/notify';
+import { LuTrash2, LuUsersRound } from 'react-icons/lu';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { PAGE_SIZE_OPTIONS } from '../../lib/pagination';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { RowMenu } from '../../components/ui/RowMenu';
-import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { Toggle } from '../../components/ui/Toggle';
 import { Button } from '../../components/ui/Button';
 import { Page } from '../../components/Page';
 import { Badge } from '../../components/ui/Badge';
-import { TextField } from '../../components/ui/Field';
-import { TextAreaField } from '../../components/ui/TextArea';
-import { RolePicker } from '../../components/pickers/RolePicker';
 import { useT } from '../../lib/i18n';
 import { useListPageState } from '../../lib/useListPageState';
 import { useAuthStore } from '../../store/authStore';
 
 export function GroupsPage() {
   const { t } = useT();
+  const navigate = useNavigate();
   const {
     page,
     setPage,
@@ -47,8 +43,6 @@ export function GroupsPage() {
   const canWrite = useAuthStore((s) => s.hasAuthority(PERMISSIONS.GROUP_WRITE));
   const canDelete = useAuthStore((s) => s.hasAuthority(PERMISSIONS.GROUP_DELETE));
 
-  const [creating, setCreating] = useState(false);
-  const [assignRolesTo, setAssignRolesTo] = useState<Group | null>(null);
   const [deleting, setDeleting] = useState<Group | null>(null);
 
   // Aligned with the backend's searchable registrations (GroupService.FILTER_FIELDS).
@@ -126,7 +120,7 @@ export function GroupsPage() {
       breadcrumb={[{ label: t('nav.identity') }, { label: t('nav.groups') }]}
       title={t('groups.title')}
       description={t('groups.desc')}
-      actions={canWrite ? <Button variant="primary" onClick={() => setCreating(true)}>{t('groups.new')}</Button> : undefined}
+      actions={canWrite ? <Button variant="primary" onClick={() => navigate('/groups/new')}>{t('groups.new')}</Button> : undefined}
     >
 
       <DataTable<Group>
@@ -166,15 +160,13 @@ export function GroupsPage() {
           <RowMenu
             ariaLabel={t('common.actions')}
             items={[
-              ...(canWrite ? [{ label: t('common.roles'), onClick: () => setAssignRolesTo(g), icon: LuShield }] : []),
+              // Create/edit live on the detail page (CRUD surface rule) — the row
+              // menu carries only the destructive action.
               ...(canDelete ? [{ label: t('common.delete'), onClick: () => setDeleting(g), icon: LuTrash2, danger: true }] : []),
             ]}
           />
         )}
       />
-
-      {creating && <CreateGroupModal onClose={() => setCreating(false)} />}
-      {assignRolesTo && <AssignGroupRolesModal group={assignRolesTo} onClose={() => setAssignRolesTo(null)} />}
 
       <ConfirmDialog
         open={!!deleting}
@@ -193,75 +185,3 @@ export function GroupsPage() {
   );
 }
 
-function CreateGroupModal({ onClose }: { onClose: () => void }) {
-  const { t } = useT();
-  const create = useCreateGroup();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [active, setActive] = useState(true);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const submit = async () => {
-    setFieldErrors({});
-    try {
-      await create.mutateAsync({ name, description: description || undefined, active });
-      notify.success(t('groups.created'));
-      onClose();
-    } catch (e) {
-      setFieldErrors(extractFieldErrors(e));
-    }
-  };
-
-  return (
-    <Modal
-      open
-      title={t('groups.newTitle')}
-      onClose={onClose}
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button variant="primary" loading={create.isPending} onClick={submit}>{t('common.create')}</Button>
-      </>}
-    >
-      <div className="flex flex-col gap-4">
-        <TextField label={t('common.name')} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('groups.namePh')} error={fieldErrors.name ?? null} required />
-        <TextAreaField label={t('common.descriptionOptional')} value={description} onChange={(e) => setDescription(e.target.value)} error={fieldErrors.description ?? null} />
-        <Toggle checked={active} onChange={setActive} label={t('common.activeLbl')} />
-      </div>
-    </Modal>
-  );
-}
-
-function AssignGroupRolesModal({ group, onClose }: { group: Group; onClose: () => void }) {
-  const { t } = useT();
-  const setRoles = useSetGroupRoles();
-  // null = untouched → follow the group's roles; first interaction pins the selection.
-  const [selected, setSelected] = useState<string[] | null>(null);
-  const effective = selected ?? group.roles.map((r) => r.id);
-
-  const submit = async () => {
-    try {
-      await setRoles.mutateAsync({ id: group.id, data: { roleIds: effective } });
-      notify.success(t('common.rolesUpdated'));
-      onClose();
-    } catch { /* global toast */ }
-  };
-
-  return (
-    <Modal
-      open
-      title={t('groups.rolesTitle', { name: group.name })}
-      onClose={onClose}
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button variant="primary" loading={setRoles.isPending} onClick={submit}>{t('common.save')}</Button>
-      </>}
-    >
-      <RolePicker
-        isMulti
-        values={effective}
-        selectedOptions={group.roles.map((r) => ({ value: r.id, label: r.name }))}
-        onValuesChange={setSelected}
-      />
-    </Modal>
-  );
-}

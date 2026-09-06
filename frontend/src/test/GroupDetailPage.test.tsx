@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GroupDetailPage } from '../features/groups/GroupDetailPage';
@@ -16,10 +17,40 @@ const GROUP = {
   memberCount: 1,
 };
 
+const CREATED_GROUP = {
+  id: 'g-9',
+  name: 'SRE',
+  description: null,
+  active: true,
+  roles: [],
+  members: [],
+  memberCount: 0,
+};
+
 const EMPTY_PAGE = {
   data: [],
   meta: { page: 0, pageSize: 200, totalElements: 0, totalPages: 0, hasNext: false, hasPrevious: false },
 };
+
+let calls: { url: string; method: string; body?: unknown }[];
+
+function stubFetch() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      let body: unknown = EMPTY_PAGE;
+      if (url === `/api/v1/groups/${GROUP.id}`) body = GROUP;
+      else if (url === `/api/v1/groups/${GROUP.id}/effective-permissions`) body = ['iam:user:read'];
+      else if (url === '/api/v1/groups/g-9/effective-permissions') body = [];
+      else if (url === '/api/v1/groups/g-9') body = CREATED_GROUP;
+      else if (url === '/api/v1/groups' && method === 'POST') body = CREATED_GROUP;
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }),
+  );
+}
 
 function renderAt(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -27,6 +58,7 @@ function renderAt(path: string) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
+          <Route path="/groups/new" element={<GroupDetailPage />} />
           <Route path="/groups/:groupId" element={<GroupDetailPage />} />
         </Routes>
       </MemoryRouter>
@@ -38,18 +70,8 @@ describe('GroupDetailPage (write gating)', () => {
   beforeEach(() => {
     useLocaleStore.setState({ locale: 'en' });
     useAuthStore.setState({ hasAuthority: () => true });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        const body = url === `/api/v1/groups/${GROUP.id}`
-          ? GROUP
-          : url === `/api/v1/groups/${GROUP.id}/effective-permissions`
-            ? ['iam:user:read']
-            : EMPTY_PAGE;
-        return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
-      }),
-    );
+    calls = [];
+    stubFetch();
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -74,5 +96,20 @@ describe('GroupDetailPage (write gating)', () => {
     expect(screen.getByText('jane@acme.dev')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
+  it('creates at /groups/new: POSTs, then lands on the created group page', async () => {
+    const user = userEvent.setup();
+    renderAt('/groups/new');
+
+    await user.type(await screen.findByPlaceholderText('e.g. Engineering'), 'SRE');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.method === 'POST' && c.url === '/api/v1/groups');
+      expect(post?.body).toEqual({ name: 'SRE', active: true });
+    });
+    // Navigation to the created group: the page heading flips to its name.
+    expect(await screen.findByRole('heading', { name: /SRE/ })).toBeInTheDocument();
   });
 });

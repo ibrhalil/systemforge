@@ -66,7 +66,7 @@ function LiveDashboard() {
   };
 
   return (
-    <div className="rounded-2xl border border-glass bg-bg/50 p-6 shadow-inner">
+    <div className="rounded-lg border border-glass bg-bg/50 p-6 shadow-sm">
       <Page
         breadcrumb={[{ label: 'Operations' }, { label: 'Platform Dashboard' }]}
         title="Tenant Health & Usage Metrics"

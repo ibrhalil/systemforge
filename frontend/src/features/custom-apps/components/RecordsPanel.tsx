@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LuEllipsisVertical, LuFilter, LuPlus, LuTrash2 } from 'react-icons/lu';
 import { DetailPanel } from '../../../components/detail/DetailPanel';
 import { Badge } from '../../../components/ui/Badge';
@@ -16,7 +17,6 @@ import type { CustomAppDetail, CustomAppRecord, CustomAppValueFilter, CustomAppV
 import { useDeleteRecord, useDeleteView, usePlanLimits, useRecords, useUpdateView, useViewRecords } from '../hooks';
 import { applyViewQuery } from '../viewQuery';
 import { useValueResolvers } from '../valueLabels';
-import { RecordFormModal } from './RecordFormModal';
 import { ViewModal } from './ViewModal';
 import { ViewFilters } from './ViewFilters';
 import { RecordTable } from './RecordTable';
@@ -43,6 +43,7 @@ const VIEW_DESC_KEYS: Record<ViewType, MessageKey> = {
  */
 export function RecordsPanel({ customApp }: { customApp: CustomAppDetail }) {
   const { t } = useT();
+  const navigate = useNavigate();
   const canManageViews = useAuthStore((s) => s.hasAuthority(PERMISSIONS.CUSTOM_APP_WRITE));
   const canWriteRecords = useAuthStore((s) => s.hasAuthority(PERMISSIONS.CUSTOM_APP_RECORD_WRITE));
 
@@ -57,8 +58,6 @@ export function RecordsPanel({ customApp }: { customApp: CustomAppDetail }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewModal, setViewModal] = useState<{ mode: 'new' } | { mode: 'edit'; view: CustomAppView } | null>(null);
   const [deletingView, setDeletingView] = useState<CustomAppView | null>(null);
-  const [creatingRecord, setCreatingRecord] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<CustomAppRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<CustomAppRecord | null>(null);
 
   const delView = useDeleteView(customApp.id);
@@ -122,16 +121,20 @@ export function RecordsPanel({ customApp }: { customApp: CustomAppDetail }) {
     }
   };
 
+  // Record create/edit live on the record page (K-58 CRUD surface rule) — every
+  // renderer's onRequestEdit becomes a navigation; create buttons navigate to
+  // /apps/:id/records/new. Only the destructive confirm stays here.
+  const openRecord = (record: CustomAppRecord) => navigate(`/apps/${customApp.id}/records/${record.id}`);
   const renderer = (() => {
     if (!activeView || (activeView.type === 'TABLE' && !hasQuery)) {
-      return <RecordTable customApp={customApp} onRequestEdit={setEditingRecord} />;
+      return <RecordTable customApp={customApp} onRequestEdit={openRecord} />;
     }
     const common = {
       records: visible,
       isLoading: recordsQuery.isLoading,
       resolve,
       onRequestDelete: setDeletingRecord,
-      onRequestEdit: setEditingRecord,
+      onRequestEdit: openRecord,
     };
     switch (activeView.type) {
       case 'TABLE':
@@ -140,7 +143,7 @@ export function RecordsPanel({ customApp }: { customApp: CustomAppDetail }) {
             customApp={customApp}
             override={{ records: visible, isLoading: recordsQuery.isLoading }}
             onRequestDelete={setDeletingRecord}
-            onRequestEdit={setEditingRecord}
+            onRequestEdit={openRecord}
           />
         );
       case 'BOARD':
@@ -153,7 +156,7 @@ export function RecordsPanel({ customApp }: { customApp: CustomAppDetail }) {
             records={visible}
             isLoading={recordsQuery.isLoading}
             resolve={resolve}
-            onRequestEdit={setEditingRecord}
+            onRequestEdit={openRecord}
           />
         );
       case 'LIST':
@@ -179,7 +182,7 @@ export function RecordsPanel({ customApp }: { customApp: CustomAppDetail }) {
           <div className="mb-4 flex items-center justify-between gap-3">
             <p className="m-0 text-sm text-muted">{t(VIEW_DESC_KEYS[activeView.type])}</p>
             {canWriteRecords && (
-              <Button variant="ghost" size="sm" onClick={() => setCreatingRecord(true)}>
+              <Button variant="ghost" size="sm" onClick={() => navigate(`/apps/${customApp.id}/records/new`)}>
                 <LuPlus aria-hidden className="h-4 w-4" />
                 {t('customApps.newRecord')}
               </Button>
@@ -285,12 +288,6 @@ export function RecordsPanel({ customApp }: { customApp: CustomAppDetail }) {
           onCreated={(created) => setActiveViewId(created.id)}
           onClose={() => setViewModal(null)}
         />
-      )}
-
-      {creatingRecord && <RecordFormModal customApp={customApp} onClose={() => setCreatingRecord(false)} />}
-
-      {editingRecord && (
-        <RecordFormModal customApp={customApp} record={editingRecord} onClose={() => setEditingRecord(null)} />
       )}
 
       <ConfirmDialog
