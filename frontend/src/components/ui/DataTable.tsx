@@ -21,6 +21,7 @@ import {
   type TableViewMode,
 } from '../../lib/tablePreferences';
 import type { FilterCriteria, SortState } from '../../types';
+import { useVirtualList } from '../../lib/useVirtualList';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { ColumnFilterButton, type ColumnFilterSpec } from './ColumnFilterButton';
@@ -131,6 +132,16 @@ interface DataTableProps<T> {
   emptyIcon?: IconType;
   /** Error-state icon (defaults to LuTriangleAlert). */
   errorIcon?: IconType;
+  /**
+   * Virtualization (K-56 F2, table mode only): tbody renders a fixed-row-height
+   * window inside the table's own vertical scroll container. Assumes single-line
+   * uniform rows; card/list modes ignore this.
+   */
+  virtualized?: boolean;
+  /** Uniform row height in px; defaults to the density-derived natural height. */
+  rowHeight?: number;
+  /** Max height of the internal vertical scroll container in px (default 480). */
+  scrollHeight?: number;
 }
 
 
@@ -174,6 +185,9 @@ export function DataTable<T>({
   listRender,
   emptyIcon,
   errorIcon,
+  virtualized = false,
+  rowHeight,
+  scrollHeight,
 }: DataTableProps<T>) {
   const { t } = useT();
 
@@ -482,6 +496,45 @@ export function DataTable<T>({
     density === 'compact' ? 'px-3 py-2 text-[11px]' : density === 'relaxed' ? 'px-5 py-3.5 text-sm' : 'px-4 py-3 text-xs';
   const tdPadding =
     density === 'compact' ? 'px-3 py-2 text-xs' : density === 'relaxed' ? 'px-5 py-4 text-base' : 'px-4 py-3.5 text-sm';
+
+  // ── Virtualization (K-56 F2): table mode only. Row height is forced on rendered
+  //    rows so the window math matches the DOM exactly; viewport measurement reads
+  //    the container's clientHeight (jsdom reports 0 — falls back to the configured
+  //    max so tests stay deterministic without ResizeObserver).
+  const virtualScrollMax = scrollHeight ?? 480;
+  const effectiveRowHeight = rowHeight ?? (density === 'compact' ? 33 : density === 'relaxed' ? 57 : 49);
+  const isVirtualized = virtualized && activeViewMode === 'table';
+  const stickyTh = isVirtualized ? 'sticky top-0 z-20 border-b border-glass bg-bg' : '';
+
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [vScrollTop, setVScrollTop] = useState(0);
+  const [vViewport, setVViewport] = useState(0);
+
+  const syncVirtualViewport = (el: HTMLElement) => {
+    const next = el.clientHeight || virtualScrollMax;
+    setVViewport((prev) => (prev === next ? prev : next));
+  };
+
+  const handleVirtualScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setVScrollTop(e.currentTarget.scrollTop);
+    syncVirtualViewport(e.currentTarget);
+  };
+
+  // Paging swaps the dataset — snap the window back to the top.
+  useEffect(() => {
+    if (!isVirtualized) return;
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+    setVScrollTop(0);
+  }, [page, isVirtualized]);
+
+  const vWindow = useVirtualList({
+    itemCount: data.length,
+    rowHeight: effectiveRowHeight,
+    scrollTop: vScrollTop,
+    viewportHeight: vViewport,
+  });
+  const windowedData = isVirtualized ? data.slice(vWindow.startIndex, vWindow.endIndex + 1) : data;
+  const windowBaseIndex = isVirtualized ? vWindow.startIndex : 0;
 
   return (
     <div
@@ -913,12 +966,24 @@ export function DataTable<T>({
         </div>
       ) : (
         /* Render Mode 3: Classic Table (Default) */
-        <div className="overflow-x-auto">
+        <div
+          ref={
+            isVirtualized
+              ? (el) => {
+                  scrollContainerRef.current = el;
+                  if (el) syncVirtualViewport(el);
+                }
+              : undefined
+          }
+          onScroll={isVirtualized ? handleVirtualScroll : undefined}
+          className={isVirtualized ? 'overflow-auto' : 'overflow-x-auto'}
+          style={isVirtualized ? { maxHeight: virtualScrollMax } : undefined}
+        >
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-glass bg-bg/40">
                 {selectionEnabled && (
-                  <th className={cn(MICRO_LABEL, 'w-10', thPadding)}>
+                  <th className={cn(MICRO_LABEL, 'w-10', thPadding, stickyTh)}>
                     <input
                       type="checkbox"
                       aria-label={t('table.selectAll')}
@@ -939,6 +1004,7 @@ export function DataTable<T>({
                       MICRO_LABEL,
                       'text-left',
                       thPadding,
+                      stickyTh,
                       col.className,
                     )}
                   >
@@ -951,6 +1017,7 @@ export function DataTable<T>({
                       MICRO_LABEL,
                       'text-right',
                       thPadding,
+                      stickyTh,
                     )}
                   >
                     {actionsHeader}
@@ -974,20 +1041,29 @@ export function DataTable<T>({
                   </td>
                 </tr>
               ) : (
-                data.map((row, index) => (
-                  <TableRow
-                    key={rowKey(row)}
-                    row={row}
-                    index={index}
-                    visibleColumns={visibleColumns}
-                    actions={actions}
-                    onRowClick={onRowClick}
-                    tdPadding={tdPadding}
-                    selectionEnabled={selectionEnabled}
-                    isSelected={selected.has(rowKey(row))}
-                    onToggleRow={toggleRow}
-                  />
-                ))
+                <>
+                  {isVirtualized && vWindow.offsetY > 0 && (
+                    <tr aria-hidden style={{ height: vWindow.offsetY }} />
+                  )}
+                  {windowedData.map((row, i) => (
+                    <TableRow
+                      key={rowKey(row)}
+                      row={row}
+                      index={windowBaseIndex + i}
+                      visibleColumns={visibleColumns}
+                      actions={actions}
+                      onRowClick={onRowClick}
+                      tdPadding={tdPadding}
+                      selectionEnabled={selectionEnabled}
+                      isSelected={selected.has(rowKey(row))}
+                      onToggleRow={toggleRow}
+                      virtualRowHeight={isVirtualized ? effectiveRowHeight : undefined}
+                    />
+                  ))}
+                  {isVirtualized && vWindow.bottomOffset > 0 && (
+                    <tr aria-hidden style={{ height: vWindow.bottomOffset }} />
+                  )}
+                </>
               )}
             </tbody>
           </table>
@@ -1107,6 +1183,7 @@ const TableRow = React.memo(function TableRow<T>({
   selectionEnabled,
   isSelected,
   onToggleRow,
+  virtualRowHeight,
 }: {
   row: T;
   index: number;
@@ -1117,10 +1194,12 @@ const TableRow = React.memo(function TableRow<T>({
   selectionEnabled: boolean;
   isSelected: boolean;
   onToggleRow: (row: T, index: number, shiftKey: boolean) => void;
+  virtualRowHeight?: number;
 }) {
   const { t } = useT();
   return (
     <tr
+      style={virtualRowHeight ? { height: virtualRowHeight } : undefined}
       onClick={onRowClick ? () => onRowClick(row) : undefined}
       onKeyDown={
         onRowClick
@@ -1172,6 +1251,7 @@ const TableRow = React.memo(function TableRow<T>({
   selectionEnabled: boolean;
   isSelected: boolean;
   onToggleRow: (row: T, index: number, shiftKey: boolean) => void;
+  virtualRowHeight?: number;
 }) => React.ReactElement;
 
 

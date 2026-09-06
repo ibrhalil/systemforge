@@ -1189,3 +1189,81 @@ describe('DataTable hardening (K-55 Phase 4-6)', () => {
     expect(screen.getByRole('columnheader', { name: /missing/i })).toBeInTheDocument();
   });
 });
+
+describe('DataTable virtualization (K-56 F2)', () => {
+  const bigRows: Row[] = Array.from({ length: 100 }, (_, i) => ({ id: String(i), name: `Row ${i}` }));
+
+  function renderVirtual(overrides: Partial<Parameters<typeof DataTable<Row>>[0]> = {}) {
+    return renderTable({
+      data: bigRows,
+      pageSize: 100,
+      totalElements: 100,
+      totalPages: 1,
+      virtualized: true,
+      scrollHeight: 480,
+      ...overrides,
+    });
+  }
+
+  const dataRows = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('tbody tr')).filter(
+      (tr) => !tr.hasAttribute('aria-hidden'),
+    ) as HTMLElement[];
+  const spacerRows = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('tbody tr[aria-hidden]')) as HTMLElement[];
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    useLocaleStore.setState({ locale: 'en' });
+  });
+
+  it('renders only the viewport window with spacer rows (default density rowHeight 49)', () => {
+    const { container } = renderVirtual();
+
+    // viewport 480 / 49px rows -> 10 visible + 4 overscan below = 14 rendered rows.
+    expect(dataRows(container).length).toBe(14);
+    expect(spacerRows(container).length).toBe(1); // top spacer is 0 at scrollTop 0
+    expect(dataRows(container)[0]).toHaveTextContent('Row 0');
+    expect(dataRows(container)[13]).toHaveTextContent('Row 13');
+    expect(spacerRows(container)[0].style.height).toBe(`${(100 - 1 - 13) * 49}px`);
+  });
+
+  it('renders every row when virtualized is off', () => {
+    const { container } = renderTable({ data: bigRows, pageSize: 100, totalElements: 100, totalPages: 1 });
+
+    expect(dataRows(container).length).toBe(100);
+    expect(spacerRows(container).length).toBe(0);
+  });
+
+  it('moves the window on scroll and forces row height', () => {
+    const { container } = renderVirtual();
+    const scroller = container.querySelector('div.overflow-auto');
+    expect(scroller).not.toBeNull();
+
+    Object.defineProperty(scroller, 'scrollTop', { value: 40 * 49, configurable: true });
+    fireEvent.scroll(scroller!);
+
+    const rendered = dataRows(container);
+    // start = 40 - 4 = 36, end = 53 (10 viewport rows + 4 overscan each side).
+    expect(rendered.length).toBe(18);
+    expect(rendered[0]).toHaveTextContent('Row 36');
+    expect(rendered[17]).toHaveTextContent('Row 53');
+    expect(spacerRows(container)[0].style.height).toBe(`${36 * 49}px`);
+    expect(rendered[0].style.height).toBe('49px');
+  });
+
+  it('honors a custom rowHeight', () => {
+    const { container } = renderVirtual({ rowHeight: 40 });
+
+    // 480/40 = 12 viewport rows + 4 overscan below = 16.
+    expect(dataRows(container).length).toBe(16);
+    expect(dataRows(container)[0].style.height).toBe('40px');
+  });
+
+  it('ignores virtualization in card view mode', () => {
+    const { container } = renderVirtual({ viewModes: ['card', 'table'], viewMode: 'card' });
+
+    expect(container.querySelector('table')).toBeNull();
+    expect(screen.getAllByText(/Row \d+/).length).toBe(100);
+  });
+});
