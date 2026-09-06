@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { LuChevronDown, LuLogOut, LuMenu } from 'react-icons/lu';
@@ -11,6 +11,11 @@ import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Spinner } from './ui/Spinner';
 import { useT } from '../lib/i18n';
 import { cn } from '../lib/cn';
+
+// DEV-only (K-56 F1): read-only query cache inspector — tree-shaken from prod builds.
+const QueryInspector = import.meta.env.DEV
+  ? lazy(() => import('./ui/QueryInspector').then((m) => ({ default: m.QueryInspector })))
+  : null;
 
 const navBase =
   'flex items-center gap-3 border-l-[3px] px-3 py-2 text-sm font-medium transition-colors';
@@ -292,6 +297,12 @@ export function AppShell() {
               <SidebarContent onNavigate={() => setDrawerOpen(false)} />
             </aside>
           </div>
+        )}
+
+        {QueryInspector && (
+          <Suspense fallback={null}>
+            <QueryInspector />
+          </Suspense>
         )}
       </div>
     </BreadcrumbTargetContext.Provider>

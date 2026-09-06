@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { LuBuilding2, LuKeyRound, LuLogOut, LuMail, LuScrollText } from 'react-icons/lu';
 import { usePlatformAuthStore } from '../../store/platformAuthStore';
@@ -9,6 +9,11 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Spinner } from '../../components/ui/Spinner';
 import { useT } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
+
+// DEV-only (K-56 F1): read-only query cache inspector — tree-shaken from prod builds.
+const QueryInspector = import.meta.env.DEV
+  ? lazy(() => import('../../components/ui/QueryInspector').then((m) => ({ default: m.QueryInspector })))
+  : null;
 
 interface PlatformNavItem {
   to: string;
@@ -169,6 +174,12 @@ export function PlatformShell() {
           onConfirm={handleLogout}
           onClose={() => setConfirmingLogout(false)}
         />
+
+        {QueryInspector && (
+          <Suspense fallback={null}>
+            <QueryInspector />
+          </Suspense>
+        )}
       </div>
     </BreadcrumbTargetContext.Provider>
   );

@@ -17,6 +17,11 @@ function renderInspector(): QueryClient {
 }
 
 describe('QueryInspector (K-56 F1, dev-only)', () => {
+  it('renders nothing without a QueryClientProvider (bare shell tests)', () => {
+    render(<QueryInspector />);
+    expect(screen.queryByRole('button', { name: 'Query inspector' })).not.toBeInTheDocument();
+  });
+
   it('is collapsed by default and opens on toggle', async () => {
     renderInspector();
     const toggle = screen.getByRole('button', { name: 'Query inspector' });
