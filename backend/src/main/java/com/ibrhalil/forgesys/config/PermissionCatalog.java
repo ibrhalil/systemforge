@@ -31,6 +31,8 @@ public final class PermissionCatalog {
     public static final String IAM_AUDIT_READ = "iam:audit:read";
     public static final String IAM_MODULE_READ = "iam:module:read";
     public static final String IAM_MODULE_WRITE = "iam:module:write";
+    public static final String IAM_SAVED_VIEW_READ = "iam:saved-view:read";
+    public static final String IAM_SAVED_VIEW_WRITE = "iam:saved-view:write";
 
     // pm:* — definitions live in ModuleDefinition.PM (module-owned); constants here
     // are the single naming source referenced by controllers.
@@ -77,7 +79,9 @@ public final class PermissionCatalog {
             new PermissionDefinition(IAM_GROUP_DELETE, "Delete tenant groups"),
             new PermissionDefinition(IAM_AUDIT_READ, "Read tenant audit logs and login history"),
             new PermissionDefinition(IAM_MODULE_READ, "Read tenant modules (catalog + activation state)"),
-            new PermissionDefinition(IAM_MODULE_WRITE, "Activate tenant modules")
+            new PermissionDefinition(IAM_MODULE_WRITE, "Activate tenant modules"),
+            new PermissionDefinition(IAM_SAVED_VIEW_READ, "Read own saved list views"),
+            new PermissionDefinition(IAM_SAVED_VIEW_WRITE, "Create, replace or delete own saved list views")
     );
 
     private PermissionCatalog() {
