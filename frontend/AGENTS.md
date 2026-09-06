@@ -285,3 +285,9 @@ Shipped: optional `bulkActions?: BulkAction<T>[]` prop automatically prepends ch
 
 Shipped: `viewModes?: TableViewMode[]` (table/card/list) + the toolbar view-switcher (`table.viewMode`), `cardRender?: (row: T) => ReactNode` / `listRender?: (row: T) => ReactNode` custom renderers (auto-generated structured cards when omitted), column visibility + density (`compact/normal/relaxed`) and the persisted `viewMode` — all stored via `tablePreferences` under the table's `storageKey` in localStorage. Per-column hiding keeps `hideable: false` primary columns visible. No further work planned here; new render modes follow the existing prop pattern.
 
+---
+
+### 3. Virtualized Table Mode — **IMPLEMENTED** (K-56 F2)
+
+Shipped: `virtualized?: boolean` + `rowHeight?: number` + `scrollHeight?: number` props (table view mode only — card/list ignore them). The table carries its own max-height vertical scroll container with a sticky thead (`sticky top-0 z-20`); rows render through the zero-dependency `lib/useVirtualList` window with top/bottom spacer `<tr>`s and forced row heights (math↔DOM exact). `rowHeight` defaults to the density-derived natural height (compact 33 / normal 49 / relaxed 57); paging snaps the window back to the top; Shift-selection keeps absolute row indices. Live demo: `/demo/datatable` section 12 (5k rows + toggle).
+

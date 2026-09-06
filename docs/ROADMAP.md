@@ -22,6 +22,7 @@ Platform çekirdeği kullanımda: schema-per-tenant multi-tenancy, iki fazlı te
 | Audit genişletme | `@AuditLog` AOP, delta kaydı, `t_request_logs` + endpoint + UI, high-risk body masking | K-19, K-27 |
 | **K-48 — user lifecycle + mail** | SMTP kanalı (`MailSender` port + Smtp/Log/InMemory sender'lar, TR/EN şablonlar), `t_auth_tokens` (digest-at-rest + supersede-on-reissue + atomic claim), opsiyonel email doğrulama (verify-email/resend), self-service password reset (forgot/reset, uniform-200 no-enumeration, session kill), `TokenPurgeJob` (ilk `@EnableScheduling`) | K-48 (+RISK-30) |
 | **K-50 — platform süperadmin + servis hesapları** | Global platform kimliği (`public` şeması: `t_platform_users`/`t_platform_api_keys`/`t_platform_audit_logs`), ayrı platform auth yüzeyi (`scope=platform` JWT + `sf_platform_*` cookie'leri), tenant lifecycle + abonelik/modül/rapor endpoint'leri, servis hesapları (`X-API-Key`, scope'lu), tenant'a giriş (switch code → impersonation JWT `act` claim'li, API mirroring yok), RISK-18 kapanışı + K-24 kaldırma, frontend `/platform/*` konsolu + tenant shell impersonation banner | K-50 (+RISK-18) |
+| **K-56 — advanced table features** | Dev-only `QueryInspector` (QueryClient cache event'leri), DataTable sanallaştırma (sıfır-bağımlılık `useVirtualList` + dahili scroll container + sticky header), saved views DB v2 (tenant V6 `t_saved_views`, JSONB snapshot + prefs bloğu, sessiz localStorage migrasyonu, `iam:saved-view:*`; K-55 açık takibi kapandı) | K-56 |
 
 ## Kalan İşler
 
