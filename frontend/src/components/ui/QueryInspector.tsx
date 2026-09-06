@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
 import type { QueryCache } from '@tanstack/react-query';
 import { LuActivity, LuX } from 'react-icons/lu';
 import { cn } from '../../lib/cn';
@@ -35,15 +35,17 @@ function statusClass(q: CacheQuery): string {
 
 /**
  * DEV-only (K-56 F1): read-only TanStack Query cache inspector — floating panel listing
- * live queries (key, status, fetch/observer counts). Mount only behind import.meta.env.DEV.
+ * live queries (key, status, fetch/observer counts). Mount only behind import.meta.env.DEV;
+ * renders nothing outside a QueryClientProvider (shells render bare in unit tests).
  */
 export function QueryInspector() {
-  const queryClient = useQueryClient();
+  const queryClient = useContext(QueryClientContext);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
-  const [queries, setQueries] = useState<CacheQuery[]>(() => queryClient.getQueryCache().getAll());
+  const [queries, setQueries] = useState<CacheQuery[]>(() => queryClient?.getQueryCache().getAll() ?? []);
 
   useEffect(() => {
+    if (!queryClient) return;
     const cache = queryClient.getQueryCache();
     setQueries(cache.getAll());
     return cache.subscribe(() => setQueries(cache.getAll()));
@@ -56,6 +58,8 @@ export function QueryInspector() {
       : [...queries];
     return matched.sort((a, b) => lastUpdatedAt(b) - lastUpdatedAt(a));
   }, [queries, filter]);
+
+  if (!queryClient) return null;
 
   if (!open) {
     return (
