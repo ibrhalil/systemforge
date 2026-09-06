@@ -21,6 +21,8 @@ export const PERMISSIONS = {
   AUDIT_READ: 'iam:audit:read',
   MODULE_READ: 'iam:module:read',
   MODULE_WRITE: 'iam:module:write',
+  SAVED_VIEW_READ: 'iam:saved-view:read',
+  SAVED_VIEW_WRITE: 'iam:saved-view:write',
   PROJECT_READ: 'pm:project:read',
   PROJECT_WRITE: 'pm:project:write',
   PROJECT_DELETE: 'pm:project:delete',
