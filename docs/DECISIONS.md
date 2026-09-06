@@ -19,8 +19,8 @@ Standart haline gelmiş kararlar. Yeni gereksinim bunlardan biriyle çelişirse 
 | # | Karar | Kaynak |
 |---|-------|--------|
 | 1 | Multi-tenancy = schema-per-tenant | ARCHITECTURE.md |
-| 2 | Registry'ler kodda (enum) — DB katalog tablosu yok | K-16 |
-| 3 | Modül migration'ları `db/migration/module/<key>` + per-module Flyway history | K-16 |
+| 2 | Registry'ler kodda (enum / final-class katalog) — DB katalog tablosu yok | K-16 |
+| 3 | Modül migration'ları `db/migration/module/<key>` + per-module Flyway history (pm istisna: tenant baseline'da, `ownMigrations=false`) | K-16 |
 | 4 | Auth = RS256 JWT cookie + opaque refresh (Redis, rotasyon + reuse detection) | K-34 |
 | 5 | Revoke = `tokenInvalidBefore` (user-scoped) + `jti` blacklist (granular) | RISK-21 + K-34 |
 | 6 | RBAC = `@PreAuthorize` + `{module}:{resource}:{action}` namespace | K-26 |
@@ -28,8 +28,8 @@ Standart haline gelmiş kararlar. Yeni gereksinim bunlardan biriyle çelişirse 
 | 8 | Admin = `all_permissions` flag (implicit süper-kullanıcı) | K-35 |
 | 9 | LastAdminGuard write path'lerde (son aktif admin kaybedilemez) | RISK-35 |
 | 10 | Plan/module limitleri = soft-block 403, veri asla gizlenmez | K-15/K-16 |
-| 11 | Wire contract = `PageResponse` + `ApiErrorResponse` + stable `ErrorCode` | K-37 |
-| 12 | Sort/filter = whitelist + JPA metamodel sabitleri | backend/AGENTS.md |
+| 11 | Wire contract = `PageResponse` + `ApiErrorResponse` + stable `ErrorCode` (K-52 bilinçli istisna: pre-prod'da `CUSTOM_APP_*` wire yeniden adlandırma) | K-37 |
+| 12 | Sort/filter = whitelist + `FilterFieldSet` alan kayıtları (K-49) + `sq` blob wire (K-55); kayıt jpamodelgen isim sabitleriyle | K-49 + backend/AGENTS.md |
 | 13 | Frontend = data-driven routing + RequirePermission + TanStack Query + Zustand | frontend/AGENTS.md |
 | 14 | Auth transport = httpOnly cookie + transparent refresh | K-34 |
 | 15 | Migration sürümleme = location başına tek `V1` baseline + `V2+` (K-36 + 2026-08-27 consolidation) | K-36 |
@@ -319,6 +319,14 @@ Standart haline gelmiş kararlar. Yeni gereksinim bunlardan biriyle çelişirse 
 - **Araştırma:** TanStack Virtual vs custom (sabit satır yüksekliğinde saf pencere matematiği yeterli — sıfır bağımlılık tercih edildi); window-scroll vs internal-container sanallaştırma (internal — sayfa-scroll kenar durumlarından kaçınır); PG'de unique ifadenin ancak UNIQUE INDEX olabilmesi; Testcontainers+OrbStack (`/var/run/docker.sock` ölü Desktop symlink'i → `DOCKER_HOST` gerekti).
 - **Durum:** TAMAMEN UYGULANDI (2026-09-06). BE 801 test + gated `SavedViewIT` 4/4 (gerçek PG: provisioned şemalarda V6 tablo + unique index, replace-on-save, kullanıcı-arası ve tenant-arası izolasyon); FE 378 test + lint + build. Plan dosyası tamamlandı → silindi.
 - **Etki:** K-55'in "saved views DB sürümü" açık takibi KAPANDI; saved views cross-device. Yeni liste sayfaları `SavedViewsMenu` (+ `onApplyPrefs`) ile bağlanabilir (tek üretim tüketicisi bugün `RequestLogsPage`). Sticky header, tablo modunda sanallaştırmayla geldi (kapsayıcı yeniden yapısı K-55 takibini kısmen kapattı). Sanallaştırma canlı: `/demo/datatable` bölüm 12.
+
+### K-57
+**E2E Playwright — prod-like jar topolojisi + SPA serving düzeltmesi**
+- **Bağlam:** Kritik kullanıcı yolları (signup→verify→login, session, password reset, modül CRUD) hiç E2E testiyle korunmuyordu; Vitest/RTL bileşen düzeyinde kalıyordu. Tek-jar topolojisi (backend + gömülü SPA `:8080`) hiç dağıtılmamıştı ve **bug barındırıyordu**: `SecurityConfig` `anyRequest().authenticated()` `GET /`, `/login`, `/verify-tenant`'ı 401'liyordu + SPA fallback yoktu (eşleşmeyen yollar 404) — mail'deki doğrulama linkine tıklayan kullanıcı uygulamaya ulaşamıyordu.
+- **Karar:** (1) **Topology: prod-like jar** (`backend/target/forgesys-backend.jar`, Vite dev server değil — kullanıcı kararı; gap'i ve gerçek prod deneyimini yakalar). (2) **Phase 1 SPA fix:** `WebMvcConfig`'de `PathResourceResolver` fallback — statik eşleşme yoksa `index.html`; `/api/`, `/actuator/`, `/v3/`, `swagger-ui` yollarında resolver **null** döner → `NoResourceFoundException` JSON 404 semantiği korunur; `SecurityConfig`'de predicate tabanlı permitAll (yalnız GET/HEAD + non-API prefix — blanket `/**` değil). (3) **Mail doğrulaması Mailpit REST ile black-box** (uygulamada test hook'u yok): `GET /api/v1/messages` alıcıya göre client-side filtre + `/api/v1/message/{id}` gövdesinden link regex. (4) **Spec başına tenant provisioning** (`e2e-<epoch>-<rand>` subdomain; register→Mailpit→sync verify) — paralel-güvenli, tekrar koşum çakışmaz. (5) **CI `e2e` job'ı required gate** — `changes.e2e = backend || frontend`; full reactor `package -DskipTests` (jar SPA gömmez `-pl backend -am` yetmez) + `docker compose up -d db redis mailpit` + `npx playwright install --with-deps chromium`. (6) `vitest.config.ts`'ye explicit `include: ['src/test/**']` ZORUNLU (default glob `e2e/*.spec.ts`'yi toplardı).
+- **Kullanıcı kararları:** prod-like jar topolojisi (Vite dev server reddedildi); kapsam core 4 akış (platform login/impersonation spec bilinçli dışarıda); CI'da required PR gate; negatif auth testleri throwaway tenant'ta (lockout tuzağı: 5 hatalı giriş/15 dk hesabı kilitler).
+- **Durum:** UYGULANDI (2026-09-06). `SpaFallbackTest` 5/5 + BE süit 806 yeşil; 5 E2E spec ×2 koşum 5/5 (15 sn); CI e2e job'ı ekildi (ilk push'ta doğrulanacak). Plan dosyası silindi.
+- **Etki:** Verify link'i **bare host**'ta gelir (`{sub}` henüz ACTIVE değilken subdomain çözümlenemez — bilinçli); login sonrası subdomain host'u `Chromium` `*.localhost` → 127.0.0.1 çözümlemesiyle hosts-file'sız çalışır. FE `TextField`'ler for/id ilişkisiz → spec'ler placeholder/role ile seçer. `npm run e2e` önkoşulları README Build Komutları'nda; CI doğrulaması ilk push'ta. Kapsam dışı bilinçli: visual regression, mobile viewport, platform login/impersonation, cross-tenant senaryoları (`CrossTenantIsolationTest` kapsar).
 
 ---
 

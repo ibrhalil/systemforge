@@ -23,6 +23,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       docker: ${{ steps.filter.outputs.docker }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,11 +78,19 @@ jobs:
           else
             DOCKER_CHANGED=false
           fi
+          # E2E (K-57) tek jar'da ikisini de paketler -> backend VEYA frontend
+          # değişince koşar (FRONTEND_RE zaten frontend/e2e/** kapsar).
+          if [ "$BACKEND_CHANGED" = true ] || [ "$FRONTEND_CHANGED" = true ]; then
+            E2E_CHANGED=true
+          else
+            E2E_CHANGED=false
+          fi
 
           {
             echo "backend=$BACKEND_CHANGED"
             echo "frontend=$FRONTEND_CHANGED"
             echo "docker=$DOCKER_CHANGED"
+            echo "e2e=$E2E_CHANGED"
           } >> "$GITHUB_OUTPUT"
 
   backend:
@@ -185,6 +194,81 @@ jobs:
 
       - name: Build (tsc -b && vite build)
         run: npm run build
+
+  # K-57: prod-like jar topolojisinde (backend + gömülü SPA, :8080) kritik
+  # kullanıcı yollarının E2E doğrulaması — required PR gate'i. Backend VEYA
+  # frontend değişince koşar; docker job'unun needs'i DEĞİŞMEDİ (kardeş gate).
+  e2e:
+    name: E2E (Playwright — prod-like jar)
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Lock file yok — frontend job'ı ile aynı ~/.npm tarball cache pattern'i.
+      - name: Cache npm (~/.npm)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --include=optional
+
+      # npm install tarayıcı indirmez (browsers.json sadece kayıt tutar).
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start infra (db + redis + mailpit)
+        run: docker compose up -d db redis mailpit
+
+      - name: Wait for infra health
+        run: |
+          for i in $(seq 1 30); do
+            HEALTHY=$(docker compose ps --format '{{.Health}}' db redis mailpit | grep -c '^healthy$' || true)
+            if [ "$HEALTHY" -ge 3 ]; then echo "infra healthy"; exit 0; fi
+            sleep 2
+          done
+          docker compose ps
+          exit 1
+
+      # FULL reactor build — jar'a SPA gömmek için frontend modülü de gerekir
+      # (-pl backend -am frontend'i atlar, CI backend job'undaki kasıtlı kısayol).
+      - name: Build jar (full reactor)
+        run: ./mvnw --no-transfer-progress clean package -DskipTests
+
+      # CI=true: webServer reuse yok, retry 1, trace on-first-retry.
+      - name: Run E2E
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: Upload Playwright report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
 
   docker:
     name: Docker (build + GHCR publish)
