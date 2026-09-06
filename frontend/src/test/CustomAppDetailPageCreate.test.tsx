@@ -9,6 +9,7 @@ import { useLocaleStore } from '../store/localeStore';
 import type { CustomAppDetail } from '../features/custom-apps/types';
 
 const APP_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const CREATED_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 const APP: CustomAppDetail = {
   id: APP_ID,
@@ -23,6 +24,14 @@ const APP: CustomAppDetail = {
   views: [],
 };
 
+/** POST response for create (summary shape); its detail GET returns a full object. */
+const CREATED_APP: CustomAppDetail = {
+  ...APP,
+  id: CREATED_ID,
+  name: 'Inventory',
+  icon: null,
+};
+
 const EMPTY_PAGE = { data: [], meta: { page: 0, pageSize: 100, totalElements: 0, totalPages: 0, hasNext: false, hasPrevious: false } };
 
 let calls: { method: string; url: string; body?: string }[] = [];
@@ -32,8 +41,14 @@ function stubFetch() {
     'fetch',
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      calls.push({ method: init?.method ?? 'GET', url, body: init?.body ? String(init.body) : undefined });
-      const body = url === `/api/v1/custom-apps/${APP_ID}` ? APP : EMPTY_PAGE;
+      const method = init?.method ?? 'GET';
+      calls.push({ method, url, body: init?.body ? String(init.body) : undefined });
+      let body: unknown = EMPTY_PAGE;
+      if (url === `/api/v1/custom-apps/${APP_ID}`) body = APP;
+      else if (url === `/api/v1/custom-apps/${CREATED_ID}`) body = CREATED_APP;
+      // Create POST returns the created app — the page navigates to its detail,
+      // so the payload must carry a real id (garbage here crashed the view render).
+      else if (url === '/api/v1/custom-apps' && method === 'POST') body = CREATED_APP;
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }),
   );
@@ -76,6 +91,8 @@ describe('CustomAppDetailPage (create + inline edit, icon picker)', () => {
       expect(post).toBeDefined();
       expect(JSON.parse(post!.body!)).toEqual({ name: 'Inventory', icon: '🛒' });
     });
+    // Create lands on the created app's page (heading flips, no render crash).
+    expect(await screen.findByRole('heading', { name: 'Inventory' })).toBeInTheDocument();
   });
 
   it('creates without an icon when none is picked', async () => {
@@ -89,6 +106,7 @@ describe('CustomAppDetailPage (create + inline edit, icon picker)', () => {
       const post = calls.find((c) => c.method === 'POST' && c.url === '/api/v1/custom-apps');
       expect(JSON.parse(post!.body!)).toEqual({ name: 'Inventory' });
     });
+    expect(await screen.findByRole('heading', { name: 'Inventory' })).toBeInTheDocument();
   });
 
   it('preselects the stored icon on edit and sends an explicit null when cleared', async () => {

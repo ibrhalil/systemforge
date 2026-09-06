@@ -96,7 +96,11 @@ export function CustomAppDetailPage() {
   };
 
   if (!isCreate && isLoading) return <DetailLoading message={t('customApps.loadingApp')} />;
-  if (!isCreate && !isLoading && !customApp) return <DetailNotFound message={t('customApps.notFound')} backLabel={t('customApps.backToApps')} backTo="/custom-apps" />;
+  // Shape guard: a truthy but non-detail payload (summary/error shape) must not
+  // reach the view render — `customApp.properties` access would crash the page.
+  if (!isCreate && !isLoading && (!customApp || !Array.isArray(customApp.properties))) {
+    return <DetailNotFound message={t('customApps.notFound')} backLabel={t('customApps.backToApps')} backTo="/custom-apps" />;
+  }
 
   const heading = isCreate ? t('customApps.formNew') : (customApp?.icon ? `${customApp.icon} ${customApp.name}` : (customApp?.name ?? ''));
 
